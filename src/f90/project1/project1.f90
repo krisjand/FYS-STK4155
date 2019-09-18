@@ -6,7 +6,7 @@ program project1
   implicit none
   ! fixed (should be initialized, not changed)
   integer(kind=4)    :: n, p, seed          
-  real(8)            :: sigma, det
+  real(8)            :: sigma, det, t1,t2
 
 
   ! variable
@@ -39,6 +39,7 @@ program project1
      stop
   end if
 
+  CALL CPU_TIME(t1)
   !  default values
   sigma=0.0d0
   p = 0
@@ -112,7 +113,9 @@ program project1
   call solve_problem1
   if (verbocity > 0) call print_problem1
 
-  
+  CALL CPU_TIME(t2)
+  write(*,*) t2-t1
+
   ! Output to file any desired parameters:
   
   if (write_data) call write_to_disk
