@@ -9,13 +9,8 @@ program project1
   integer(kind=4)    :: n_arg, ind, i, j, n, p, seed
   real(8)            :: sigma, det
   
-  sigma=0.1d0
-  p = 4
-  n = 21
-
-
   n_arg=iargc()
-  if (iargc() > 0)  call getarg(1,partxt)
+  if (n_arg > 0)  call getarg(1,partxt)
 
   if (n_arg < 1 .or. partxt == 'help' ) then
      write(*,*) ' '
@@ -34,41 +29,89 @@ program project1
      write(*,*) ' -print            :: (logical, .false.) include to write results to file'
      write(*,*) ' -debug            :: (logical, .false.) include to run code in debug mode'
      write(*,*) ' -label [label]    :: (string, empty) label to add to end of output files'
+     write(*,*)
+     stop
   end if
 
-  ind=0
-  do while (ind <= n_arg)
+  !  default values
+  sigma=0.0d0
+  p = 0
+  seed = 20198935
+  verbocity = 0
+  rnd = .false.
+  print_data = .false.
+  debug = .false.
+  label = ''
+  
+  ind=1
+  call getarg(ind,partxt)
+  read(partxt,*) n
+
+  !reed in options
+  do while (ind < n_arg)
      ind=ind+1
      call getarg(ind,partxt)
      if (partxt=='-p') then
-
+        ind=ind+1 
+        call getarg(ind,partxt)
+        read(partxt,*) p
+     elseif (partxt=='-sigma') then
+        ind=ind+1 
+        call getarg(ind,partxt)
+        read(partxt,*) sigma
+     elseif (partxt=='-seed') then
+        ind=ind+1 
+        call getarg(ind,partxt)
+        read(partxt,*) seed
+     elseif (partxt=='-verb') then
+        ind=ind+1 
+        call getarg(ind,partxt)
+        read(partxt,*) verbocity
+     elseif (partxt=='-label') then
+        ind=ind+1 
+        call getarg(ind,partxt)
+        label=trim(partxt)
+     elseif (partxt=='-rnd') then
+        rnd=.true.
+     elseif (partxt=='-print') then
+        print_data=.true.
+     elseif (partxt=='-debug') then
+        debug=.true.
      end if
-
   end do
      
   if (iargc() > 0) then
      call getarg(1,partxt)
      read(partxt,*) seed
   else
-     seed = 20198935
+
   end if
 
-  ! Initialize time grids
+  ! Initialize random number generators
   call initialize_RNG(seed)
 
+  ! debugging codes
   if (debug) call test_linalg
   if (debug) call test_rng
 
-  write(*,*) 0.d0**0
-  
+  !Problem 1
+  if (verbocity > 0) then
+     write(*,*) 'Problem 1'
+     write(*,*) '-----------------------'
+  end if
   call initialize_problem1(n,p,sigma)
-
   call solve_problem1
+  if (verbocity > 0) then
+     write(*,*) '------------------------------------'
+     write(*,*) 'beta values:'
+     call print_beta_values(p)
+     write(*,*) '------------------------------------'
+     write(*,*) ''
+  end if
 
-  write(*,*) b_p
   ! Output to file any desired parameters:
   
-  if (print) then ! Output milestone 2 parameters
+  if (print_data) then ! Output milestone 2 parameters
      filename='xy.dat'
      OPEN(UNIT=1,FILE=filename)
      do i = 1,n

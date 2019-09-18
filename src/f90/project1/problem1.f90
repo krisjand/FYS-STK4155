@@ -1,6 +1,7 @@
 module problem1
   use RNGesus
   use linalg
+  use common_flags
   implicit none
 
 
@@ -31,7 +32,7 @@ contains
     integer(kind=4)       :: i, j, k, l, m, ind  ! Integers for looping and indexing
     real(8)               :: dx
 
-    write(*,*) 'initializing'
+    if (verbocity > 0) write(*,*) 'Initializing problem 1'
     n_x  = n
     n_p  = 0
     n_xy = n*n
@@ -73,18 +74,18 @@ contains
     allocate(XYtXY(n_p,n_p))
     allocate(XYf(n_p,1))
     allocate(XYtXYi(n_p,n_p))
-
-    write(*,*) 'transposing'
+    if (verbocity > 0) write(*,*) 'Solving problem 1'
+    if (verbocity > 1) write(*,*) 'transposing XY'
     call matrix_T2D(XY,XYt)
-    write(*,*) 'XYt*XY'
+    if (verbocity > 1) write(*,*) 'XYt*XY'
     call matrix_mult2D(XYt,XY,XYtXY)
-    write(*,*) 'XYt*f'
+    if (verbocity > 1) write(*,*) 'XYt*f'
     call matrix_mult2D(XYt,f_n,XYf)
-    write(*,*) 'inv(XYt*XY)'
+    if (verbocity > 1) write(*,*) 'inv(XYt*XY)'
     call matrix_inv2D(XYtXY,XYtXYi)
-    write(*,*) '(XYt XY)^-1 * (XYt*f)'
+    if (verbocity > 1) write(*,*) '(XYt XY)^-1 * (XYt*f)'
     call matrix_mult2D(XYtXYi,XYf,b_p)
-
+    if (verbocity > 0) write(*,*) '' 
   end subroutine solve_problem1
 
   function franke(x,y)
@@ -98,6 +99,60 @@ contains
 
     franke = term1 + term2 + term3 - term4
   end function franke
-  
 
+  subroutine print_beta_values(p)
+    integer(kind=4), intent(in) :: p    ! number of x-values (n) and polynomial degree (p)
+    integer(kind=4)       :: i, j, k, l, m, ind  ! Integers for looping and indexing
+    character(len=256)    :: str, str2
+    character(len=8)      :: partxt
+
+    l=0
+    do k = 0,p
+       do m = 0,k
+          l=l+1
+          str='beta_'
+          write(partxt,'(I8)') l
+          partxt=adjustl(partxt)
+          str=trim(str)//partxt//'='
+
+          if (k==0) then
+             str2='1'
+          elseif (k==1) then
+             if (m==0) then
+                str2='x'
+             else
+                str2='y'
+             end if
+          else
+             if (k-m==0) then
+                write(partxt,'(I8)') m
+                partxt=adjustl(partxt)
+                str2='y^'//trim(partxt)
+             elseif (k-m==1) then
+                str2='x'
+                if (m==1) then
+                   str2=trim(str2)//' y'
+                else
+                   write(partxt,'(I8)') m
+                   partxt=adjustl(partxt)
+                   str2=trim(str2)//' y^'//trim(partxt)
+                end if
+             else
+                write(partxt,'(I8)') k-m
+                partxt=adjustl(partxt)
+                str2='x^'//trim(partxt)
+                if (m==1) then
+                   str2=trim(str2)//' y'
+                elseif (m>1) then
+                   write(partxt,'(I8)') m
+                   partxt=adjustl(partxt)
+                   str2=trim(str2)//' y^'//trim(partxt)
+                end if
+             end if
+          end if
+          write(*,*) trim(str), b_p(l,1), trim(str2)
+       end do
+    end do
+
+  end subroutine print_beta_values
 end module problem1
