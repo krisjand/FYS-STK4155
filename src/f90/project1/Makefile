@@ -8,15 +8,16 @@ OUTPUT  = project1
 
 
 # List of source files to be compiled
-OBJS    = linalg.o RNGesus.o problem1.o project1.o 
+OBJS    = linalg.o RNGesus.o problem1.o project1.o common_flags.o
 
 # Linking stage
 hw1: $(OBJS)
 	$(FC) $(OPTIM) -o $(OUTPUT) $(OBJS)
 
 # Dependencies
-hw1.o           : problem2.o RNGesus.o linalg.o
-problem1.o      : RNGesus.o linalg.o
+hw1.o           : problem1.o RNGesus.o linalg.o common_flags.o
+problem1.o      : RNGesus.o linalg.o common_flags.o
+linalg.o        : common_flags.o
 
 # Compilation of source files
 %.o : %.f90

@@ -75,15 +75,23 @@ contains
     
   end subroutine matrix_mult2D
 
-  subroutine matrix_inv2D(X_in, X_out)
+  subroutine matrix_inv2D(X_in, X_out, check)
     real(8), dimension(:,:), intent(in)  :: X_in
     real(8), dimension(:,:), intent(out) :: X_out
+    logical, optional,       intent(in)  :: check
     real(8), dimension(:,:), allocatable :: X
     real(8), dimension(:), allocatable   :: lineX
 
     real(8)           :: detX
+    logical           :: check_det
     integer(kind=4)   :: shape_X(2), m, n ! Integers for shape of matrices
     integer(kind=4)   :: i, j, k, l       ! Integers for looping 
+
+    if (present(check)) then
+       check_det=check
+    else
+       check_det=.false.
+    end if
 
     shape_X=shape(X_in)
     m=shape_X(1)
@@ -102,13 +110,16 @@ contains
        stop
     end if
 
-    call get_det2D(X_in,detX)
-    if (detX == 0.d0) then
-       X_out = 0.d0
-       write(*,*) 'matrix has det = 0.0. Not invertable'
-       return
+    if (check_det .and. m < 11) then !determinants take a long time to compute after NxN = 10x10
+       ! scaling in operations is N! (10x10 --> 10! ~ 3.6 million )
+       call get_det2D(X_in,detX)
+       if (detX == 0.d0) then
+          X_out = 0.d0
+          write(*,*) 'matrix has det = 0.0. Not invertable'
+          return
+       end if
     end if
-    
+
     !init matrix to reduce
     allocate(X(m,2*m))
     allocate(lineX(2*m))
@@ -119,7 +130,7 @@ contains
     end do
 
     !reduce
-    do i = 1,m-1
+    do i = 1,m !if i = m, we only check if X(i,i)=0.d0
        k=i
        do j=i+1,m
           if (abs(X(j,i)) > abs(X(k,i))) k=j
@@ -130,6 +141,14 @@ contains
           X(i,:)=lineX
        end if
 
+       !need to check if we are dividing by 0.d0 if determinant is not checked, or numerical
+       !precision makes this happen
+       if (X(i,i)==0.d0) then
+          !We have put the line with the largest absolute value in column i in row i.
+          !If this value is 0.d0, then all values are 0.d0 and we have a zero determinant.
+          !then the inverse matrix doesn't exist
+          write(*,*) 'matrix has det = 0.0, Matrix is not invertable'
+       end if
        do j=i+1,m
           lineX=(X(j,i)/X(i,i))*X(i,:)
           X(j,:)=X(j,:)-lineX
@@ -137,7 +156,7 @@ contains
     end do
 
     !reduce opposite way (no switch)
-    do i = m,2,-1
+    do i = m,2,-1 !don't need to reduce other lines (i>1) using the first line (i=1)
        do j=i-1,1,-1
           lineX=(X(j,i)/X(i,i))*X(i,:)
           X(j,:)=X(j,:)-lineX
@@ -161,7 +180,8 @@ contains
     real(8) :: det_i
 
     integer(kind=4)   :: shape_X(2), m, n ! Integers for shape of matrices
-    integer(kind=4)   :: i, j             ! Integers for looping 
+    integer(kind=4)   :: i, j             ! Integers for looping
+    character(len=32) :: M_str, partxt
 
     shape_X=shape(X_in)
     m=shape_X(1)
@@ -175,6 +195,12 @@ contains
     elseif (m==1) then
        det=X_in(1,1)
     else
+       if (m>10) then
+          write(partxt,'(I10)') m
+          partxt=adjustl(partxt)
+          M_str = '('//trim(partxt)//'x'//trim(partxt)//')'
+          write(*,*) 'WARNING: calculating determinant of a large matrix '//trim(M_str)//', this might take a very long time!'
+       end if
        allocate(X_temp(m-1,m-1))
        do i = 1,m
           X_temp(:,1:i-1)=X_in(2:,1:i-1)
