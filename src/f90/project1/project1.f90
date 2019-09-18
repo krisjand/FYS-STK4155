@@ -4,10 +4,14 @@ program project1
   use common_flags
 
   implicit none
-    
-  character(len=256) :: filename, partxt
-  integer(kind=4)    :: n_arg, ind, i, j, n, p, seed
+  ! fixed (should be initialized, not changed)
+  integer(kind=4)    :: n, p, seed          
   real(8)            :: sigma, det
+
+
+  ! variable
+  character(len=256) :: filename, partxt
+  integer(kind=4)    :: n_arg, ind, i, j, l 
   
   n_arg=iargc()
   if (n_arg > 0)  call getarg(1,partxt)
@@ -42,12 +46,13 @@ program project1
   print_data = .false.
   debug = .false.
   label = ''
-  
+
+  !get n (number of x- and y-values)
   ind=1
   call getarg(ind,partxt)
   read(partxt,*) n
 
-  !reed in options
+  !read in options
   do while (ind < n_arg)
      ind=ind+1
      call getarg(ind,partxt)
@@ -80,20 +85,16 @@ program project1
      end if
   end do
      
-  if (iargc() > 0) then
-     call getarg(1,partxt)
-     read(partxt,*) seed
-  else
-
-  end if
-
   ! Initialize random number generators
   call initialize_RNG(seed)
 
   ! debugging codes
-  if (debug) call test_linalg
-  if (debug) call test_rng
-
+  if (debug) then
+     call test_linalg
+     call test_rng
+     stop !stop after debug
+  end if
+  
   !Problem 1
   if (verbocity > 0) then
      write(*,*) 'Problem 1'
@@ -101,14 +102,9 @@ program project1
   end if
   call initialize_problem1(n,p,sigma)
   call solve_problem1
-  if (verbocity > 0) then
-     write(*,*) '------------------------------------'
-     write(*,*) 'beta values:'
-     call print_beta_values(p)
-     write(*,*) '------------------------------------'
-     write(*,*) ''
-  end if
+  if (verbocity > 0) call print_problem1
 
+  
   ! Output to file any desired parameters:
   
   if (print_data) then ! Output milestone 2 parameters
@@ -121,8 +117,12 @@ program project1
 
      filename='beta.dat'
      OPEN(UNIT=1,FILE=filename)
-     do i = 1,p+1
-        write(1,*) b_p(i,1)
+     l=0
+     do i = 0,p
+        do j = 0,i
+           l=l+1
+           write(1,*) l, b_p(l,1)
+        end do
      end do
      CLOSE(1)
   end if

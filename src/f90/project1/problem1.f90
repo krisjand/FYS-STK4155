@@ -11,16 +11,17 @@ module problem1
   real(8),    allocatable, dimension(:,:) :: b_p      ! Grid of beta values
 
   
-  integer(kind=4), private                      :: n_p      ! Number of betas to fit
-  integer(kind=4), private                      :: n_x      ! Number of x-values
-  integer(kind=4), private                      :: n_xy     ! Number of xy-values
+  integer(kind=4), private                      :: poly     ! Degree of polynomial
+  integer(kind=4), private                      :: n_p      ! Number of betas to fit (P)
+  integer(kind=4), private                      :: n_x      ! Number of x-values (N)
+  integer(kind=4), private                      :: n_xy     ! Number of xy-values (N**2)
 
   real(8), private, allocatable, dimension(:,:) :: XY       ! matrix of x*y polynomials (N**2xP)
   real(8), private, allocatable, dimension(:,:) :: XYt      ! transpose of XY (PxN)
   real(8), private, allocatable, dimension(:,:) :: XYtXY    ! XYt*XY (PxP)
   real(8), private, allocatable, dimension(:,:) :: XYtXYi   ! inverse of XYt*XY (PxP)
   real(8), private, allocatable, dimension(:,:) :: XYf      ! XY_t * f (P x 1)
-
+  real(8), private :: MSE, R2
   
 contains
 
@@ -34,8 +35,9 @@ contains
 
     if (verbocity > 0) write(*,*) 'Initializing problem 1'
     n_x  = n
-    n_p  = 0
+    poly = p
     n_xy = n*n
+    n_p  = 0
     do i = 0,p
        n_p = n_p + i + 1
     end do
@@ -67,7 +69,7 @@ contains
 
   subroutine solve_problem1
     implicit none
-
+    real(8) :: term1, term2
     integer(kind=4)       :: i, j          ! Integers for looping 
 
     allocate(XYt(n_p,n_x**2))
@@ -86,20 +88,55 @@ contains
     if (verbocity > 1) write(*,*) '(XYt XY)^-1 * (XYt*f)'
     call matrix_mult2D(XYtXYi,XYf,b_p)
     if (verbocity > 0) write(*,*) '' 
+
+    !check errors
+    MSE=0.d0
+    do i = 1,n_xy
+       MSE=MSE+(f_n(i,1)-polynom_xy(XY(i,:)))**2
+    end do
+    MSE=MSE/n_xy
+    
+    
   end subroutine solve_problem1
 
   function franke(x,y)
     real(8), intent(in) :: x,y
     real(8) :: franke, term1, term2, term3, term4
 
-    term1 = 3.d0/4.d0*exp(-(9.d0*x-2.d0)**2/4.d0 - (9.d0*y-2.d0)**2/4.d0 ) 
-    term2 = 3.d0/4.d0*exp(-(9.d0*x+1.d0)**2/49.d0 - (9.d0*y+1.d0)/10.d0 ) 
-    term3 = 1.d0/2.d0*exp(-(9.d0*x-7.d0)**2/4.d0 - (9.d0*y-3.d0)**2/4.d0 ) 
-    term4 = 1.d0/5.d0*exp(-(9.d0*x-4.d0)**2 - (9.d0*y-7.d0)**2 ) 
+    term1 = 0.75d0*exp(-(9.d0*x-2.d0)**2/4.d0 - (9.d0*y-2.d0)**2/4.d0 ) 
+    term2 = 0.75d0*exp(-(9.d0*x+1.d0)**2/49.d0 - (9.d0*y+1.d0)/10.d0 ) 
+    term3 = 0.5d0*exp(-(9.d0*x-7.d0)**2/4.d0 - (9.d0*y-3.d0)**2/4.d0 ) 
+    term4 = -0.2d0*exp(-(9.d0*x-4.d0)**2 - (9.d0*y-7.d0)**2 ) 
 
-    franke = term1 + term2 + term3 - term4
+    franke = term1 + term2 + term3 + term4
   end function franke
 
+  function polynom_xy(xy_vec)
+    implicit none
+    real(8), dimension(:),   intent(in)  :: xy_vec !the different polynomials of x and y
+    real(8)    :: polynom_xy
+    integer(4) :: i
+
+    polynom_xy=0.d0    
+    do i = 1,n_p
+       polynom_xy = polynom_xy + xy_vec(i)*b_p(i,1)
+    end do
+    
+  end function polynom_xy
+
+  subroutine print_problem1
+    implicit none
+    
+    write(*,*) '------------------------------------'
+    write(*,*) 'beta values:'
+    call print_beta_values(poly)
+    write(*,*) '------------------------------------'
+    write(*,*) 'Mean Square Error:'
+    write(*,*) 'MSE =',MSE
+    write(*,*) '------------------------------------'
+
+  end subroutine print_problem1
+  
   subroutine print_beta_values(p)
     integer(kind=4), intent(in) :: p    ! number of x-values (n) and polynomial degree (p)
     integer(kind=4)       :: i, j, k, l, m, ind  ! Integers for looping and indexing
