@@ -29,11 +29,13 @@ program project1
      write(*,*) ' -p [order]        :: (int, 0) polynomial order'
      write(*,*) ' -seed [seed]      :: (int, 20198935) seed value for the RNG'
      write(*,*) ' -verb [verbocity] :: (int, 0) different amount of terminal output '
-     write(*,*) ' -rnd              :: (logical, .false.) random uniform (x,y) values'
-     write(*,*) ' -print            :: (logical, .false.) include to write results to file'
+     write(*,*) ' -write            :: (logical, .false.) include to write results to file'
      write(*,*) ' -debug            :: (logical, .false.) include to run code in debug mode'
      write(*,*) ' -label [label]    :: (string, empty) label to add to end of output files'
-     write(*,*)
+     write(*,*) ' -rnd [version]    :: (int, 0) distribution of x and y. (0) equidist. grid'
+     write(*,*) '                            (1) two uniformly distributed sets for x & y'
+     write(*,*) '                            (2) a uniformly distributed set of (x,y) pairs'
+     write(*,*) ''
      stop
   end if
 
@@ -42,8 +44,8 @@ program project1
   p = 0
   seed = 20198935
   verbocity = 0
-  rnd = .false.
-  print_data = .false.
+  rnd = 0
+  write_data = .false.
   debug = .false.
   label = ''
 
@@ -75,11 +77,17 @@ program project1
      elseif (partxt=='-label') then
         ind=ind+1 
         call getarg(ind,partxt)
-        label=trim(partxt)
+        label='_'//trim(partxt)
      elseif (partxt=='-rnd') then
-        rnd=.true.
-     elseif (partxt=='-print') then
-        print_data=.true.
+        ind=ind+1 
+        call getarg(ind,partxt)
+        read(partxt,*) rnd
+        if (rnd < 0 .or. rnd > 2) then
+           write(*,*) 'ERROR: unvalid (x,y) distribution [rnd]'
+           stop
+        end if
+     elseif (partxt=='-write') then
+        write_data=.true.
      elseif (partxt=='-debug') then
         debug=.true.
      end if
@@ -107,24 +115,7 @@ program project1
   
   ! Output to file any desired parameters:
   
-  if (print_data) then ! Output milestone 2 parameters
-     filename='xy.dat'
-     OPEN(UNIT=1,FILE=filename)
-     do i = 1,n
-        write(1,*) x_n(i,1),y_n(i,1)
-     end do
-     CLOSE(1)
+  if (write_data) call write_to_disk
 
-     filename='beta.dat'
-     OPEN(UNIT=1,FILE=filename)
-     l=0
-     do i = 0,p
-        do j = 0,i
-           l=l+1
-           write(1,*) l, b_p(l,1)
-        end do
-     end do
-     CLOSE(1)
-  end if
 
 end program project1

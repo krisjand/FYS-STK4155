@@ -21,7 +21,9 @@ module problem1
   real(8), private, allocatable, dimension(:,:) :: XYtXY    ! XYt*XY (PxP)
   real(8), private, allocatable, dimension(:,:) :: XYtXYi   ! inverse of XYt*XY (PxP)
   real(8), private, allocatable, dimension(:,:) :: XYf      ! XY_t * f (P x 1)
-  real(8), private :: MSE, R2
+  real(8), private :: MSE    ! Mean square error
+  real(8), private :: R2     ! R square value
+  real(8), private :: sig    ! sigma
   
 contains
 
@@ -34,6 +36,7 @@ contains
     real(8)               :: dx
 
     if (verbocity > 0) write(*,*) 'Initializing problem 1'
+    sig = s
     n_x  = n
     poly = p
     n_xy = n*n
@@ -42,34 +45,47 @@ contains
        n_p = n_p + i + 1
     end do
     
-    allocate(x_n(1:n_x,1),y_n(1:n_x,1),b_p(1:n_p,1))
-    allocate(XY(n_xy,n_p),f_n(n_xy,1))
+    allocate(XY(n_xy,n_p),f_n(n_xy,1),b_p(1:n_p,1))
+    allocate(x_n(1:n_xy,1),y_n(1:n_xy,1))
 
-    dx = 1.d0/(n_x-1)
-    do i = 1,n_x
-       x_n(i,1) = (i-1)*dx
-    end do
-    y_n = x_n
+    if (rnd<2) then !init random positions from uniform distributions
+       if (rnd==0) then !equidistant grid
+          dx = 1.d0/(n_x-1)
+          do i = 1,n_x
+             x_n(n_x*(i-1)+1:n_x*i,1) = (i-1)*dx
+             y_n(i:n_xy:n_x,1) = (i-1)*dx
+          end do
+       else ! x and y have uniform distr. but they create a grid.
+          do i = 1,n_x
+             x_n((n_x-1)*i+1:n_x*i,1) = ran1()
+             y_n(i:n_xy:n_x,1) = ran1()
+          end do
+       end if
+    else ! x anf y create n_x**2 (x,y) pairs (uniform prob. dist.)
+       do i = 1,n_xy
+          x_n(i,1) = ran1()
+          y_n(i,1) = ran1()
+       end do
+    end if
 
-    do i = 1,n_x
-       do j = 1,n_x
-          ind = i + n_x*(j-1)
-          f_n(ind,1)=franke(x_n(i,1),y_n(j,1)) + s*random_normal(0.d0,1.d0)
-          l = 0
-          do k = 0,p
-             do m = 0,k
-                l=l+1
-                XY(ind,l) = x_n(i,1)**(k-m) * y_n(j,1)**m
-             end do
+    !calculate the different polynomials x^i * y^j
+    do i = 1,n_xy
+       f_n(i,1)=franke(x_n(i,1),y_n(i,1)) + sig*random_normal(0.d0,1.d0)
+       l = 0
+       do k = 0,p
+          do m = 0,k
+             l=l+1
+             XY(i,l) = x_n(i,1)**(k-m) * y_n(i,1)**m
           end do
        end do
     end do
     
   end subroutine initialize_problem1
 
+  
   subroutine solve_problem1
     implicit none
-    real(8) :: term1, term2
+    real(8) :: term1, term2, mean_f
     integer(kind=4)       :: i, j          ! Integers for looping 
 
     allocate(XYt(n_p,n_x**2))
@@ -91,10 +107,19 @@ contains
 
     !check errors
     MSE=0.d0
+    mean_f=0.d0
     do i = 1,n_xy
        MSE=MSE+(f_n(i,1)-polynom_xy(XY(i,:)))**2
+       mean_f=mean_f+f_n(i,1)
     end do
+    term1=MSE
     MSE=MSE/n_xy
+    mean_f=mean_f/n_xy
+    term2=0.d0
+    do i = 1,n_xy
+       term2=term2+(f_n(i,1)-mean_f)**2
+    end do
+    R2 = 1.d0 - term1/term2
     
     
   end subroutine solve_problem1
@@ -134,6 +159,10 @@ contains
     write(*,*) 'Mean Square Error:'
     write(*,*) 'MSE =',MSE
     write(*,*) '------------------------------------'
+    write(*,*) 'R squared score'
+    write(*,*) 'R^2 =',R2
+    write(*,*) '------------------------------------'
+    write(*,*) ''
 
   end subroutine print_problem1
   
@@ -190,6 +219,47 @@ contains
           write(*,*) trim(str), b_p(l,1), trim(str2)
        end do
     end do
-
   end subroutine print_beta_values
+
+  subroutine write_to_disk
+    character(len=256) :: filename, partxt, endlabel
+    integer(kind=4)    :: ind, i, j, l 
+        
+
+    write(partxt,'(I8)') poly
+    partxt=adjustl(partxt)
+    endlabel='_p'//trim(partxt)
+    write(partxt,'(I8)') n_x
+    partxt=adjustl(partxt)
+    endlabel=trim(endlabel)//'_n'//trim(partxt)
+    write(partxt,'(I8)') rnd
+    partxt=adjustl(partxt)
+    endlabel=trim(endlabel)//'_rnd'//trim(partxt)
+    write(partxt,'(F6.2)') sig
+    partxt=adjustl(partxt)
+    endlabel=trim(endlabel)//'_s'//trim(partxt)
+    endlabel=trim(endlabel)//trim(label)//'.dat'
+
+    filename='xy'//trim(endlabel)
+    OPEN(UNIT=1,FILE=filename)
+    do i = 1,n_xy
+       write(1,*) x_n(i,1),y_n(i,1)
+    end do
+    CLOSE(1)
+
+    filename='franke'//trim(endlabel)
+    OPEN(UNIT=1,FILE=filename)
+    do i = 1,n_xy
+       write(1,*) x_n(i,1),y_n(i,1)
+    end do
+    CLOSE(1)
+
+    filename='beta'//trim(endlabel)
+    OPEN(UNIT=1,FILE=filename)
+    l=0
+    do i = 1,n_p
+       write(1,*) i, b_p(i,1)
+    end do
+    CLOSE(1)
+  end subroutine write_to_disk
 end module problem1
