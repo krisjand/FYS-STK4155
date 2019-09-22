@@ -30,7 +30,12 @@ def polfit(deg,n2,xv,yv,fv):
     
     t2=np.sum((fv-fm)**2)
     r2=1.0-t1/t2
-    return beta,mse,r2
+
+    beta_var=np.zeros(shape=(n_p,1))
+    for i in range(n_p):
+        beta_var[i,0]=mse*np.sqrt(XtXi[i,i])
+        
+    return beta,mse,r2,beta_var
 
 
     
