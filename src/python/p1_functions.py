@@ -1,4 +1,29 @@
 import numpy as np
+import matplotlib.pyplot as plt
+from params import *
+
+def init_xy_vectors(n,rand,xmin=0.0,xmax=1.0):
+    
+    if (rand):
+        x_vec=np.random.uniform(xmin,xmax,size=(n**2,1))
+        y_vec=np.random.uniform(xmin,xmax,size=(n**2,1))
+    else:
+        dx=np.zeros(1)
+        dx=(xmax-xmin)/(n-1)
+        n2=n**2
+        x_vec=np.zeros(shape=(n**2,1))
+        y_vec=np.zeros(shape=(n**2,1))
+        for i in range(n):
+            x_vec[n*i:n*(i+1),0]=xmin + i*dx
+            y_vec[i:n2:n,0]=xmin + i*dx
+    return x_vec,y_vec
+
+def FrankeFunction(x,y):
+    term1 = 0.75*np.exp(-(0.25*(9*x-2)**2) - 0.25*((9*y-2)**2))
+    term2 = 0.75*np.exp(-((9*x+1)**2)/49.0 - 0.1*(9*y+1))
+    term3 = 0.5*np.exp(-(9*x-7)**2/4.0 - 0.25*((9*y-3)**2))
+    term4 = -0.2*np.exp(-(9*x-4)**2 - (9*y-7)**2)
+    return term1 + term2 + term3 + term4
 
 def polfit(deg,xv,yv,fv):
     n_p = (deg+1)*(deg+2)//2 #triangular rule but we have defined deg=0 for n=1
@@ -223,3 +248,107 @@ def polfit_kfold(xk,yk,fk,nk,k,n2,deg):
 
         
     return msek,r2k,betas
+
+def mse_plot_tradeoff(k,n_vec, rnd,xmin=0.0,xmax=1.0, p_lim=-1):
+    global verbosity
+    global sigma
+    for i in range(len(n_vec)):
+        n=np.copy(n_vec[i])
+        if(verbosity > 0):
+            print(' xy-grid NxN, N = %i'%(n))
+
+        # init x and y points, both in equidistant grids or as random points
+        x_vec,y_vec=init_xy_vectors(n,rnd[i],xmin=xmin,xmax=xmax)
+        n2=n**2
+        #calculate franke function values
+        f_vec=FrankeFunction(x_vec,y_vec)
+        #add noise
+        if (sigma > 0.0):
+            noise=np.random.normal(0.0,1.0,n2)*sigma
+            f_vec[:,0]=f_vec[:,0]+noise
+
+        #split data
+        xk,yk,fk,nk=split_data_kfold(x_vec,y_vec,f_vec,k)
+
+        # run over polynomial degrees from 0 to the maximal number given that
+        # the matrices are invertable
+        # We need at least N = n_p = (p+1)*(p+2)/2 different points
+        # 2*N = p**2 + 3p + 2
+        # p**2 + 3p - 2(N-1) = 0
+        # I.e. for any N, p must be smaller than the positive solution to the equation above
+        # p = (-3 + sqrt(3**2 +8(N-1) )/2
+        # for N = 7, p = 2.275, i.e. p_max = 2 --> n_p = 6
+        
+        N_data=n2-nk[0] #first fold (data set) always contains the most data points
+        p_max = int((-3.0 + np.sqrt(9.0+8.0*(N_data-1)))/2.0)
+        if (p_lim>0):
+            p_max=min(p_lim,p_max)
+        n_deg=p_max+1
+
+        mse_mean=np.zeros(shape=(n_deg,2))
+        mse_error=np.zeros(shape=(3,n_deg,2)) #(error type, complexity, train/test)
+        # error type: (0) lower MSE, (1) higher MSE, (2) std of mean MSE
+        # train/test: (0) train, (1) test
+        p_plot=np.zeros(shape=(n_deg))
+
+        for p in range(n_deg):
+            msek,r2k,betak=polfit_kfold(xk,yk,fk,nk,k,n2,p)
+            mse_mean[p,0]=np.sum(msek[:,0])/k
+            mse_mean[p,1]=np.sum(msek[:,1])/k
+            mse_error[0,p,0]=mse_mean[p,0]-np.amin(msek[:,0])
+            mse_error[1,p,0]=np.amax(msek[:,0])-mse_mean[p,0]
+            mse_error[2,p,0]=np.sqrt(1.0/(k-1.0)*np.sum((msek[:,0]-mse_mean[p,0])**2))
+            mse_error[0,p,1]=mse_mean[p,1]-np.amin(msek[:,1])
+            mse_error[1,p,1]=np.amax(msek[:,1])-mse_mean[p,1]
+            mse_error[2,p,1]=np.sqrt(1.0/(k-1.0)*np.sum((msek[:,1]-mse_mean[p,1])**2))
+            
+            p_plot[p]=p*1.0
+            
+            # print the different MSE values for each k-fold modelling
+            if (verbosity > 1):
+                print('')
+                print('-----------------------------------------------------')
+                print("polynomial of degree %i"%(p))
+                print('')
+                print('group    mse_tr       mse_te       r2_tr')
+                for j in range(k):
+                    print('  %i    %.4e   %.4e   %.4e '%(j,msek[j,0], msek[j,1],r2k[j,0]))
+                print(' tot   %.4e   %.4e   '%(np.sum(msek[:,0])/k, np.sum(msek[:,1])/k))
+                print('')
+                if (p==2):
+                    print(' train_err        %.4e   %.4e   '%(mse_error[0,p,0], mse_error[1,p,0]))
+                    print(' test_err         %.4e   %.4e   '%(mse_error[0,p,1], mse_error[1,p,1]))
+                    print(' std (train,test) %.4e   %.4e   '%(mse_error[2,p,0], mse_error[2,p,1]))
+            elif(verbosity > 0):
+                print('  pol. deg. %i'%(p))
+
+        #plot the MSE to complexity plot
+        for m in range(2):
+            plt.figure(1)
+            if (m==0):
+                plt.errorbar(p_plot,mse_mean[:,0],yerr=mse_error[:2,:,0],label='train', fmt='.')
+                plt.errorbar(p_plot+0.1,mse_mean[:,1],yerr=mse_error[:2,:,1],label='test',fmt='x')
+            else:
+                plt.errorbar(p_plot,mse_mean[:,0],yerr=mse_error[2,:,0],label='train',fmt='.')
+                plt.errorbar(p_plot+0.1,mse_mean[:,1],yerr=mse_error[2,:,1],label='test',fmt='x')
+                
+            plt.legend()
+            plt.xlabel('Complexity (polynomial degree)')
+            plt.ylabel('Mean Square Error')
+            plt.yscale('log')
+            if (rnd[i]):
+                plt.title('Mean Square Error (MSE) for %i^2 (x,y) points'%(n))
+                if (m==0):
+                    plt.savefig('tradeoff_Nsq_%i'%(n)+'_minmax.png')
+                else:
+                    plt.savefig('tradeoff_Nsq_%i'%(n)+'_std.png')
+            else:
+                plt.title('Mean Square Error (MSE) for a grid of %i'%(n)+'x%i'%(n))
+                if (m==0):
+                    plt.savefig('tradeoff_Nsq_%i'%(n)+'_minmax.png')
+                else:
+                    plt.savefig('tradeoff_NxN_%i'%(n)+'_std.png')
+                
+            plt.show()
+            plt.clf()
+    return

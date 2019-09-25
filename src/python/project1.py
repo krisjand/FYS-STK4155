@@ -7,27 +7,20 @@ from matplotlib.ticker import LinearLocator, FormatStrFormatter
 import numpy as np
 from random import random, seed
 import time
-from p1_functions import *
 
+from params import *
 
 # Make data.
 n=21
 n2=n**2
-sigma=0.1
-seed= 2236242
+
 np.random.seed(seed)
-verbosity=1
+
+from p1_functions import *
 
 x = np.arange(0, 1.0001, 1.0/(n-1))
 y = np.arange(0, 1.0001, 1.0/(n-1))
 x, y = np.meshgrid(x,y)
-
-def FrankeFunction(x,y):
-    term1 = 0.75*np.exp(-(0.25*(9*x-2)**2) - 0.25*((9*y-2)**2))
-    term2 = 0.75*np.exp(-((9*x+1)**2)/49.0 - 0.1*(9*y+1))
-    term3 = 0.5*np.exp(-(9*x-7)**2/4.0 - 0.25*((9*y-3)**2))
-    term4 = -0.2*np.exp(-(9*x-4)**2 - (9*y-7)**2)
-    return term1 + term2 + term3 + term4
 
 z = FrankeFunction(x, y)
 
@@ -52,15 +45,9 @@ plt.clf()
 
 t1=time.time()
 
-x_vec=np.zeros(shape=(n2,1))
-y_vec=np.zeros(shape=(n2,1))
 f_vec=np.zeros(shape=(n2,1))
 
-dx=np.zeros(1)
-dx=1.0/(n-1)
-for i in range(n):
-    x_vec[n*i:n*(i+1),0]=i*dx
-    y_vec[i:n2:n,0]=i*dx
+x_vec,y_vec=init_xy_vectors(n,False)
 
 #calculate franke function values
 f_vec=FrankeFunction(x_vec,y_vec)
@@ -93,7 +80,7 @@ ind_tr,ind_te=split_data(x_vec,70.0)
 #resample betas for only the training data, then evaluate the MSE for the test data
 for p in range(0):
     beta,mse,r2,beta_var = polfit(p,x_vec[ind_tr],y_vec[ind_tr],f_vec[ind_tr])
-    if (verbocity > 1):
+    if (verbosity > 1):
         for i in range(len(beta)):
             print('beta_%i   %2.4e    %2.4e   %2.4e    %2.4e    %2.4e'%(i,beta[i,0],beta_var[i,0],np.sqrt(beta_var[i,0]),1.96*np.sqrt(beta_var[i,0]),2.58*np.sqrt(beta_var[i,0])))
         print('')
@@ -118,39 +105,52 @@ for p in range(0):
         print()
 
 
-k=5
-xk,yk,fk,nk=split_data_kfold(x_vec,y_vec,f_vec,k)
+if (False):
+    k=5
+    xk,yk,fk,nk=split_data_kfold(x_vec,y_vec,f_vec,k)
 
-if (verbosity > 2):
-    for i in range(k):
-        print('')
-        print('k %i'%(i))
-        print('x             y                f')
-        for j in range(nk[i]):
-            print(xk[i,j],yk[i,j],fk[i,j])
+    if (verbosity > 2):
+        for i in range(k):
+            print('')
+            print('k %i'%(i))
+            print('x             y                f')
+            for j in range(nk[i]):
+                print(xk[i,j],yk[i,j],fk[i,j])
     
 
-for p in range(6):
-    msek,r2k,betak=polfit_kfold(xk,yk,fk,nk,k,n2,p)
-    print('')
-    print('-----------------------------------------------------')
-    print("polynomial of degree %i"%(p))
-    print('')
-    print('group    mse_tr       mse_te       r2_tr       r2_te')
-    for i in range(k):
-        print('  %i    %.4e   %.4e   %.4e  %.4e'%(i,msek[i,0], msek[i,1],r2k[i,0],r2k[i,1]))
+    for p in range(6):
+        msek,r2k,betak=polfit_kfold(xk,yk,fk,nk,k,n2,p)
+        print('')
+        print('-----------------------------------------------------')
+        print("polynomial of degree %i"%(p))
+        print('')
+        print('group    mse_tr       mse_te       r2_tr       r2_te')
+        for i in range(k):
+            print('  %i    %.4e   %.4e   %.4e  %.4e'%(i,msek[i,0], msek[i,1],r2k[i,0],r2k[i,1]))
 
-    print(' tot   %.4e   %.4e   '%(np.sum(msek[:,0])/k, np.sum(msek[:,1])/k))
+        print(' tot   %.4e   %.4e   '%(np.sum(msek[:,0])/k, np.sum(msek[:,1])/k))
+        print('')
+
+if (False):
+    k=n2
+    xk,yk,fk,nk=split_data_kfold(x_vec,y_vec,f_vec,k)
     print('')
+    print('-----------------------')
+    print('LOOCV')
+    print('')
+    print('degree   mse_tr       mse_te')
+    for p in range(6):
+        msek,r2k,betak=polfit_kfold(xk,yk,fk,nk,n2,n2,p)
 
-k=n2
-xk,yk,fk,nk=split_data_kfold(x_vec,y_vec,f_vec,k)
-print('')
-print('-----------------------')
-print('LOOCV')
-print('')
-print('degree   mse_tr       mse_te')
-for p in range(6):
-    msek,r2k,betak=polfit_kfold(xk,yk,fk,nk,n2,n2,p)
+        print(' %i   %.4e   %.4e   '%(p,np.sum(msek[:,0])/n2, np.sum(msek[:,1])/n2))
 
-    print(' %i   %.4e   %.4e   '%(p,np.sum(msek[:,0])/n2, np.sum(msek[:,1])/n2))
+
+k=5
+n_vec=np.zeros(4,dtype='int')
+n_vec[0:2]=10
+n_vec[2:]=21
+rnd=[False,True,False,True]
+mse_plot_tradeoff(k,n_vec, rnd,xmin=0.05,xmax=0.95, p_lim=14)
+
+
+        
