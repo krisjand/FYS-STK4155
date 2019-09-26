@@ -249,9 +249,16 @@ def polfit_kfold(xk,yk,fk,nk,k,n2,deg):
         
     return msek,r2k,betas
 
-def mse_plot_tradeoff(k,n_vec, rnd,xmin=0.0,xmax=1.0, p_lim=-1):
+def mse_plot_tradeoff_complexity(k,n_vec, rnd,xmin=0.0,xmax=1.0, p_lim=-1):
     global verbosity
     global sigma
+    # k = number of groups (i.e. k-fold CV)
+    # n_vec = number of gridpoints in x and y direction
+    # rnd = True/False; if True, then points are drawn from a uniform distribution
+    #                   Draws n**2 points (x,y)
+    # xmin,xmax = minimum and maximum values for the grid (in both x and y direction)
+    # p_lim = upper limit of the polynomial degree (i.e. complexity)
+
     for i in range(len(n_vec)):
         n=np.copy(n_vec[i])
         if(verbosity > 0):
@@ -337,18 +344,242 @@ def mse_plot_tradeoff(k,n_vec, rnd,xmin=0.0,xmax=1.0, p_lim=-1):
             plt.ylabel('Mean Square Error')
             plt.yscale('log')
             if (rnd[i]):
-                plt.title('Mean Square Error (MSE) for %i^2 (x,y) points'%(n))
+                plt.title('Random grid points')
                 if (m==0):
-                    plt.savefig('tradeoff_Nsq_%i'%(n)+'_minmax.png')
+                    plt.savefig('tradeoff_complex_rnd_n%i'%(n)+'_minmax.png')
                 else:
-                    plt.savefig('tradeoff_Nsq_%i'%(n)+'_std.png')
+                    plt.savefig('tradeoff_complex_rnd_n%i'%(n)+'_std.png')
             else:
-                plt.title('Mean Square Error (MSE) for a grid of %i'%(n)+'x%i'%(n))
+                plt.title('Equidistant grid points')
                 if (m==0):
-                    plt.savefig('tradeoff_Nsq_%i'%(n)+'_minmax.png')
+                    plt.savefig('tradeoff_complex_n%i'%(n)+'_minmax.png')
                 else:
-                    plt.savefig('tradeoff_NxN_%i'%(n)+'_std.png')
+                    plt.savefig('tradeoff_complex_n%i'%(n)+'_std.png')
                 
-            plt.show()
+            #plt.show()
             plt.clf()
+    return
+
+def mse_plot_tradeoff_number(k,rnd,n_min=6,n_max=30, p=5,xmin=0.0,xmax=1.0):
+    global verbosity
+    global sigma
+    # k = number of groups (i.e. k-fold CV)
+    # rnd = True/False; if True, then points are drawn from a uniform distribution
+    #                   Draws n**2 points (x,y)
+    # nmin,nmax = minimum and maximum values for the number of grid points
+    # p = the polynomial degree (i.e. complexity) of the fit
+    # xmin,xmax = minimum and maximum values for the grid (in both x and y direction)
+    
+    # n_vec = number of gridpoints in x and y direction
+    n_vec=np.arange(n_min,n_max+1,dtype='int')
+
+    n_n=len(n_vec)
+    # MSE means and errors
+    mse_mean=np.zeros(shape=(n_n,2))
+    mse_error=np.zeros(shape=(3,n_n,2)) #(error type, grid points (n*n), train/test)
+    # error type: (0) lower MSE, (1) higher MSE, (2) std of mean MSE
+    # train/test: (0) train, (1) test
+    n_plot=np.zeros(shape=(n_n))
+
+    #Find the minimum number of data points in training group
+    # each group has maximum n**2//k + 1 points
+    # each training group has then at least n**2 - (n**2//k + 1) data points
+    # n_min has the least total, so
+    n_d = n_min**2 - (n_min**2//k + 1)
+    
+    p_max = int((-3.0 + np.sqrt(9.0+8.0*(n_d-1)))/2.0)
+    if (p>p_max):
+        p=p_max
+        
+    for i in range(len(n_vec)):
+        n=np.copy(n_vec[i])
+        n_plot[i]=n
+        if(verbosity > 0):
+            print(' xy-grid NxN, N = %i'%(n))
+
+        # init x and y points, both in equidistant grids or as random points
+        x_vec,y_vec=init_xy_vectors(n,rnd,xmin=xmin,xmax=xmax)
+        n2=n**2
+        #calculate franke function values
+        f_vec=FrankeFunction(x_vec,y_vec)
+        #add noise
+        if (sigma > 0.0):
+            noise=np.random.normal(0.0,1.0,n2)*sigma
+            f_vec[:,0]=f_vec[:,0]+noise
+
+        #split data
+        xk,yk,fk,nk=split_data_kfold(x_vec,y_vec,f_vec,k)
+        
+        msek,r2k,betak=polfit_kfold(xk,yk,fk,nk,k,n2,p)
+        mse_mean[i,0]=np.sum(msek[:,0])/k
+        mse_mean[i,1]=np.sum(msek[:,1])/k
+        mse_error[0,i,0]=mse_mean[i,0]-np.amin(msek[:,0])
+        mse_error[1,i,0]=np.amax(msek[:,0])-mse_mean[i,0]
+        mse_error[2,i,0]=np.sqrt(1.0/(k-1.0)*np.sum((msek[:,0]-mse_mean[i,0])**2))
+        mse_error[0,i,1]=mse_mean[i,1]-np.amin(msek[:,1])
+        mse_error[1,i,1]=np.amax(msek[:,1])-mse_mean[i,1]
+        mse_error[2,i,1]=np.sqrt(1.0/(k-1.0)*np.sum((msek[:,1]-mse_mean[i,1])**2))
+            
+            
+        # print the different MSE values for each k-fold modelling
+        if (verbosity > 1):
+            print('')
+            print('-----------------------------------------------------')
+            print('grid n = %i,  pol. deg. = %i'%(n,p))
+            print('')
+            print('group    mse_tr       mse_te       r2_tr')
+            for j in range(k):
+                print('  %i    %.4e   %.4e   %.4e '%(j,msek[j,0], msek[j,1],r2k[j,0]))
+            print(' tot   %.4e   %.4e   '%(np.sum(msek[:,0])/k, np.sum(msek[:,1])/k))
+            print('')
+            if (p==2):
+                print(' train_err        %.4e   %.4e   '%(mse_error[0,i,0], mse_error[1,i,0]))
+                print(' test_err         %.4e   %.4e   '%(mse_error[0,i,1], mse_error[1,i,1]))
+                print(' std (train,test) %.4e   %.4e   '%(mse_error[2,i,0], mse_error[2,i,1]))
+        elif(verbosity > 0):
+            print('  grid n = %i,  pol. deg. = %i'%(n,p))
+
+    #plot the MSE to number of gridpoints plot plot
+    for m in range(2):
+        plt.figure(1)
+        if (m==0):
+            plt.errorbar(n_plot,mse_mean[:,0],yerr=mse_error[:2,:,0],label='train', fmt='.')
+            plt.errorbar(n_plot+0.1,mse_mean[:,1],yerr=mse_error[:2,:,1],label='test',fmt='x')
+        else:
+            plt.errorbar(n_plot,mse_mean[:,0],yerr=mse_error[2,:,0],label='train',fmt='.')
+            plt.errorbar(n_plot+0.1,mse_mean[:,1],yerr=mse_error[2,:,1],label='test',fmt='x')
+                
+        plt.legend()
+        plt.xlabel('Number of grid points in each dimension (n)')
+        plt.ylabel('Mean Square Error')
+        plt.yscale('log')
+        if (rnd):
+            plt.title('Random grid points')
+            if (m==0):
+                plt.savefig('tradeoff_number_rnd_p%i'%(p)+'_minmax.png')
+            else:
+                plt.savefig('tradeoff_number_rnd_p%i'%(p)+'_std.png')
+        else:
+            plt.title('Equidistant grid points')
+            if (m==0):
+                plt.savefig('tradeoff_number_p%i'%(p)+'_minmax.png')
+            else:
+                plt.savefig('tradeoff_number_p%i'%(p)+'_std.png')
+
+                
+        #plt.show()
+        plt.clf()
+    return
+
+
+def mse_plot_tradeoff_kfold(n,rnd, k_min=2, k_max=10, p=5,xmin=0.0,xmax=1.0):
+    global verbosity
+    global sigma
+    # k = number of groups (i.e. k-fold CV)
+    # rnd = True/False; if True, then points are drawn from a uniform distribution
+    #                   Draws n**2 points (x,y)
+    # nmin,nmax = minimum and maximum values for the number of grid points
+    # p = the polynomial degree (i.e. complexity) of the fit
+    # xmin,xmax = minimum and maximum values for the grid (in both x and y direction)
+    
+    # n = number of gridpoints in x and y direction
+
+    k_vec = np.arange(k_min,k_max+1,dtype='int')
+    n_k = len(k_vec)
+    
+    # MSE means and errors
+    mse_mean=np.zeros(shape=(n_k,2))
+    mse_error=np.zeros(shape=(3,n_k,2)) #(error type, grid points (n*n), train/test)
+    # error type: (0) lower MSE, (1) higher MSE, (2) std of mean MSE
+    # train/test: (0) train, (1) test
+    k_plot=np.zeros(shape=(n_k))
+
+    #Find the minimum number of data points in training group
+    # each group has maximum n**2//k + 1 points
+    # each training group has then at least n**2 - (n**2//k + 1) data points
+    n2=n**2
+    n_d = n2 - (n2//k_min + 1)
+    
+    p_max = int((-3.0 + np.sqrt(9.0+8.0*(n_d-1)))/2.0)
+    if (p>p_max):
+        p=p_max
+        
+    # init x and y points, both in equidistant grids or as random points
+    x_vec,y_vec=init_xy_vectors(n,rnd,xmin=xmin,xmax=xmax)
+    #calculate franke function values
+    f_vec=FrankeFunction(x_vec,y_vec)
+    #add noise
+    if (sigma > 0.0):
+        noise=np.random.normal(0.0,1.0,n2)*sigma
+        f_vec[:,0]=f_vec[:,0]+noise
+
+    for i in range(n_k):
+        k=k_vec[i]
+        k_plot[i]=k
+        if(verbosity > 0):
+            print(' k = %i'%(n))
+
+        #split data
+        xk,yk,fk,nk=split_data_kfold(x_vec,y_vec,f_vec,k)
+        
+        msek,r2k,betak=polfit_kfold(xk,yk,fk,nk,k,n2,p)
+        mse_mean[i,0]=np.sum(msek[:,0])/k
+        mse_mean[i,1]=np.sum(msek[:,1])/k
+        mse_error[0,i,0]=mse_mean[i,0]-np.amin(msek[:,0])
+        mse_error[1,i,0]=np.amax(msek[:,0])-mse_mean[i,0]
+        mse_error[2,i,0]=np.sqrt(1.0/(k-1.0)*np.sum((msek[:,0]-mse_mean[i,0])**2))
+        mse_error[0,i,1]=mse_mean[i,1]-np.amin(msek[:,1])
+        mse_error[1,i,1]=np.amax(msek[:,1])-mse_mean[i,1]
+        mse_error[2,i,1]=np.sqrt(1.0/(k-1.0)*np.sum((msek[:,1]-mse_mean[i,1])**2))
+            
+            
+        # print the different MSE values for each k-fold modelling
+        if (verbosity > 1):
+            print('')
+            print('-----------------------------------------------------')
+            print('grid n = %i,  pol. deg. = %i,  k-fold k = %i'%(n,p,k))
+            print('')
+            print('group    mse_tr       mse_te       r2_tr')
+            for j in range(k):
+                print('  %i    %.4e   %.4e   %.4e '%(j,msek[j,0], msek[j,1],r2k[j,0]))
+            print(' tot   %.4e   %.4e   '%(np.sum(msek[:,0])/k, np.sum(msek[:,1])/k))
+            print('')
+            if (p==2):
+                print(' train_err        %.4e   %.4e   '%(mse_error[0,i,0], mse_error[1,i,0]))
+                print(' test_err         %.4e   %.4e   '%(mse_error[0,i,1], mse_error[1,i,1]))
+                print(' std (train,test) %.4e   %.4e   '%(mse_error[2,i,0], mse_error[2,i,1]))
+        elif(verbosity > 0):
+            print('  grid n = %i,  pol. deg. = %i,  k-fold k = %i'%(n,p,k))
+
+    #plot the MSE to number of gridpoints plot plot
+    for m in range(2):
+        plt.figure(1)
+        if (m==0):
+            plt.errorbar(k_plot,mse_mean[:,0],yerr=mse_error[:2,:,0],label='train', fmt='.')
+            plt.errorbar(k_plot+0.1,mse_mean[:,1],yerr=mse_error[:2,:,1],label='test',fmt='x')
+        else:
+            plt.errorbar(k_plot,mse_mean[:,0],yerr=mse_error[2,:,0],label='train',fmt='.')
+            plt.errorbar(k_plot+0.1,mse_mean[:,1],yerr=mse_error[2,:,1],label='test',fmt='x')
+                
+        plt.legend()
+        plt.xlabel('Number of groups (k)')
+        plt.ylabel('Mean Square Error')
+        if (n<15):
+            plt.yscale('log')
+        if (rnd):
+            plt.title('Random grid points')
+            if (m==0):
+                plt.savefig('tradeoff_kfold_rnd_n%i'%(n)+'_p%i'%(p)+'_minmax.png')
+            else:
+                plt.savefig('tradeoff_kfold_rnd_n%i'%(n)+'_p%i'%(p)+'_std.png')
+        else:
+            plt.title('Equidistant grid points')
+            if (m==0):
+                plt.savefig('tradeoff_kfold_n%i'%(n)+'_p%i'%(p)+'_minmax.png')
+            else:
+                plt.savefig('tradeoff_kfold_n%i'%(n)+'_p%i'%(p)+'_std.png')
+
+                
+        #plt.show()
+        plt.clf()
     return

@@ -145,12 +145,26 @@ if (False):
         print(' %i   %.4e   %.4e   '%(p,np.sum(msek[:,0])/n2, np.sum(msek[:,1])/n2))
 
 
-k=5
-n_vec=np.zeros(4,dtype='int')
-n_vec[0:2]=10
-n_vec[2:]=21
-rnd=[False,True,False,True]
-mse_plot_tradeoff(k,n_vec, rnd,xmin=0.05,xmax=0.95, p_lim=14)
 
+k=5
+if (True):
+    n_vec=np.zeros(4,dtype='int')
+    n_vec[0:2]=10
+    n_vec[2:]=21
+    rnd=[False,True,False,True]
+    mse_plot_tradeoff_complexity(k,n_vec, rnd, p_lim=14)
+
+if (True):
+    rnd=[False,True]
+    for i in range (2):
+        mse_plot_tradeoff_number(k,rnd[i],p=5)
+
+if (True):
+    n_vec=np.zeros(4,dtype='int')
+    n_vec[0:2]=10
+    n_vec[2:]=21
+    rnd=[False,True,False,True]
+    for i in range (4):
+        mse_plot_tradeoff_kfold(n_vec[i],rnd[i],p=5)
 
         
