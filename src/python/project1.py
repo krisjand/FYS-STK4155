@@ -148,11 +148,11 @@ if (False):
 
 k=5
 if (False):
-    n_vec=np.zeros(4,dtype='int')
-    n_vec[0:2]=10
-    n_vec[2:]=21
-    rnd=[False,True,False,True]
-    mse_plot_tradeoff_complexity(k,n_vec, rnd, p_lim=14)
+    n=[10,21]
+    rnd=[False,True]
+    for i in range(2):
+        for j in range(2):
+            mse_plot_tradeoff_complexity(k,n[j], rnd[i], p_lim=14)
 
 if (False):
     rnd=[False,True]
@@ -167,16 +167,17 @@ if (False):
     for i in range (4):
         mse_plot_tradeoff_kfold(n_vec[i],rnd[i],p=5)
 
-if (False):
+if (True):
     rnd=[False,True]
     n_vec=[10,21]
     for i in range (2):
         for j in range(2):
-            mse_plot_tradeoff_lambda(n_vec[j],rnd[i],lamb_min=1e-4,lamb_max=1.0,k=k,p=5)
+            mse_plot_tradeoff_lambda(n_vec[j],rnd[i],lamb_min=1e-4,lamb_max=10.0,k=k,p=5)
 
-if (True):
-    n=21
+if (False):
+    n=[10,21]
     rnd=[False,True]
     l_vec=[0.0, 1e-6,1e-4, 1e-2, 1.0]
     for i in range(2):
-        mse_plot_tradeoff_complexity(k,n, rnd[i],lamb=l_vec, p_lim=14)
+        for j in range(2):
+            mse_plot_tradeoff_complexity(k,n[j], rnd[i],lamb=l_vec, p_lim=14)

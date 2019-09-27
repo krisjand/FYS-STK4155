@@ -50,34 +50,26 @@ def polfit(deg,xv,yv,fv,lamb=0.0):
         fv[:,0]=temp*1.0
     #build matrix
 
-    p_min=0
-    if (lamb>0.0): #Ridge reg. start at polynomials of 1st degree
-        p_min=1
-        beta[0,0]=np.sum(fv[:,0])/n2 #beta_0 is the average
     X=np.ones(shape=(n2,n_p)) #we change these values, but in the case of Ridge we don't
                               # have to change X[:,0] values for later evaluation
     if (deg > 0 or lamb==0.0):
         for i in range(n2):
-            l=p_min-1
-            for j in range(p_min,deg+1):
+            l=-1
+            for j in range(deg+1):
                 for k in range(j+1):
                     l+=1
                     X[i,l]=xv[i,0]**(j-k) * yv[i,0]**k
 
-        #If we use Ridge reg. we only use X[:,1:], i.e. X from polynom degree 1
-        Xt = X[:,p_min:].T
-        XtX = np.matmul(Xt,X[:,p_min:])
+        Xt = X.T
+        XtX = np.matmul(Xt,X)
         if (lamb>0.0): #i.e. Ridge regression
-            Xlamb=np.zeros(shape=(n_p-1,n_p-1)) #(n_p-1 x n_p-1 matrix)
-            for i in range(n_p-1):
+            Xlamb=np.zeros(shape=(n_p,n_p)) #(n_p x n_p matrix)
+            for i in range(n_p):
                 Xlamb[i,i]=lamb
             XtX=XtX+Xlamb
-            f_temp=fv-beta[0,0] #need to subtract away the average from the data
-            Xtf = np.matmul(Xt,f_temp)
-        else:
-            Xtf = np.matmul(Xt,fv)
+        Xtf = np.matmul(Xt,fv)
         XtXi = np.linalg.inv(XtX)
-        beta[p_min:,:]=np.matmul(XtXi,Xtf)
+        beta=np.matmul(XtXi,Xtf)
 
     fm=np.mean(fv[:,0])
     fxy=np.matmul(X,beta)
@@ -215,15 +207,12 @@ def polfit_kfold(xk,yk,fk,nk,k,n2,deg=5,lamb=0.0):
         
         ind=-1
         p_min=0
-        if (lamb>0.0):
-            p_min=1
-            beta[0,0]=np.sum(ftr[:,0])/nind
         for j in range(k):
             if (j==i):
                 fte[:,0]=np.copy(fk[i,:nk[i]])
                 for m in range(nk[j]):
-                    l=p_min-1
-                    for r in range(p_min,deg+1):
+                    l=-1
+                    for r in range(deg+1):
                         for s in range(r+1):
                             l+=1
                             Xte[m,l]=xk[j,m]**(r-s) * yk[j,m]**s
@@ -233,26 +222,23 @@ def polfit_kfold(xk,yk,fk,nk,k,n2,deg=5,lamb=0.0):
                 ind+=1
                 ftr[ind,0]=np.copy(fk[j,m])
                 
-                l=p_min-1
-                for r in range(p_min,deg+1):
+                l=-1
+                for r in range(deg+1):
                     for s in range(r+1):
                         l+=1
                         Xtr[ind,l]=xk[j,m]**(r-s) * yk[j,m]**s
 
         # perform polfit of beta
-        Xt = Xtr[:,p_min:].T
-        XtX = np.matmul(Xt,Xtr[:,p_min:])
+        Xt = Xtr.T
+        XtX = np.matmul(Xt,Xtr)
         if (lamb>0.0): #i.e. Ridge regression
-            Xlamb=np.zeros(shape=(n_p-1,n_p-1)) #(n_p x n_p matrix)
-            for s in range(n_p-1):
+            Xlamb=np.zeros(shape=(n_p,n_p)) #(n_p x n_p matrix)
+            for s in range(n_p):
                 Xlamb[s,s]=lamb
             XtX=XtX+Xlamb
-            f_temp=ftr-beta[0,0] #need to subtract away the average from the data
-            Xtf = np.matmul(Xt,f_temp)
-        else:
-            Xtf = np.matmul(Xt,ftr)
+        Xtf = np.matmul(Xt,ftr)
         XtXi = np.linalg.inv(XtX)
-        beta[p_min:,:]=np.matmul(XtXi,Xtf)
+        beta=np.matmul(XtXi,Xtf)
         betas[:,i]=beta[:,0]
 
         #mse and r2 for training data
@@ -419,15 +405,20 @@ def mse_plot_tradeoff_complexity(k,n, rnd,xmin=0.0,xmax=1.0, p_lim=-1,lamb=[0.0]
             #plt.show()
             plt.clf()
 
+    if (n_l ==1):
+        return # only plot multi lambda if we have more than 1 value
     for m in range(2):
         for s in range(2):
             plt.figure(1)
             for i_l in range(n_l):
-                plt.errorbar(p_plot+(-n_l//2 + i_l)*0.1,mse_mean[:,s,i_l],yerr=mse_error[:2,:,s,i_l],label='lambda = %.1e'%(l_vec[i_l]), fmt='.')
-                
+                if (m==0):
+                    plt.errorbar(p_plot+(-n_l//2 + i_l)*0.1,mse_mean[:,s,i_l],yerr=mse_error[:2,:,s,i_l],label='lambda = %.1e'%(l_vec[i_l]), fmt='.')
+                else:
+                    plt.errorbar(p_plot+(-n_l//2 + i_l)*0.1,mse_mean[:,s,i_l],yerr=mse_error[2,:,s,i_l],label='lambda = %.1e'%(l_vec[i_l]), fmt='.')
             plt.legend()
             plt.xlabel('Complexity (polynomial degree)')
             plt.ylabel('Mean Square Error')
+            plt.ylim([np.exp(np.log(np.amin(np.amin(mse_mean)))-0.2), 1.5])
             plt.yscale('log')
             outfile='tradeoff_complex_lamb_multi'
             if (rnd):
@@ -764,7 +755,7 @@ def mse_plot_tradeoff_lambda(n,rnd,lamb_min=0.1,lamb_max=1.0,n_lamb=10, log_lamb
             mse_error[1,i,1,p_i]=np.amax(msek[:,1])-mse_mean[i,1,p_i]
             mse_error[2,i,1,p_i]=np.sqrt(1.0/(k-1.0)*np.sum((msek[:,1]-mse_mean[i,1,p_i])**2))
                 
-            if (verbocity > 0):
+            if (verbosity > 0):
                 print(' p = %i, lambda = %.3e'%(p_i,lamb))
 
     #plot the MSE to lambda for pol. degree p
