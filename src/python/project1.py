@@ -119,7 +119,7 @@ if (False):
     
 
     for p in range(6):
-        msek,r2k,betak=polfit_kfold(xk,yk,fk,nk,k,n2,p)
+        msek,r2k,betak,var_bk=polfit_kfold(xk,yk,fk,nk,k,n2,p)
         print('')
         print('-----------------------------------------------------')
         print("polynomial of degree %i"%(p))
@@ -140,26 +140,26 @@ if (False):
     print('')
     print('degree   mse_tr       mse_te')
     for p in range(6):
-        msek,r2k,betak=polfit_kfold(xk,yk,fk,nk,n2,n2,p)
+        msek,r2k,betak,var_bk=polfit_kfold(xk,yk,fk,nk,n2,n2,p)
 
         print(' %i   %.4e   %.4e   '%(p,np.sum(msek[:,0])/n2, np.sum(msek[:,1])/n2))
 
 
 
 k=5
-if (True):
+if (False):
     n_vec=np.zeros(4,dtype='int')
     n_vec[0:2]=10
     n_vec[2:]=21
     rnd=[False,True,False,True]
     mse_plot_tradeoff_complexity(k,n_vec, rnd, p_lim=14)
 
-if (True):
+if (False):
     rnd=[False,True]
     for i in range (2):
         mse_plot_tradeoff_number(k,rnd[i],p=5)
 
-if (True):
+if (False):
     n_vec=np.zeros(4,dtype='int')
     n_vec[0:2]=10
     n_vec[2:]=21
@@ -167,4 +167,16 @@ if (True):
     for i in range (4):
         mse_plot_tradeoff_kfold(n_vec[i],rnd[i],p=5)
 
-        
+if (False):
+    rnd=[False,True]
+    n_vec=[10,21]
+    for i in range (2):
+        for j in range(2):
+            mse_plot_tradeoff_lambda(n_vec[j],rnd[i],lamb_min=1e-4,lamb_max=1.0,k=k,p=5)
+
+if (True):
+    n=21
+    rnd=[False,True]
+    l_vec=[0.0, 1e-6,1e-4, 1e-2, 1.0]
+    for i in range(2):
+        mse_plot_tradeoff_complexity(k,n, rnd[i],lamb=l_vec, p_lim=14)
