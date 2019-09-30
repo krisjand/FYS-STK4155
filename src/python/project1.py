@@ -5,45 +5,18 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib.ticker import LinearLocator, FormatStrFormatter
 import numpy as np
-from random import random, seed
+from sklearn import linear_model
+#from random import random, seed
 import time
 
 from params import *
+from p1_functions import *
+from plot_3d import *
 
-# Make data.
 n=21
 n2=n**2
 
-np.random.seed(seed)
-
-from p1_functions import *
-
-x = np.arange(0, 1.0001, 1.0/(n-1))
-y = np.arange(0, 1.0001, 1.0/(n-1))
-x, y = np.meshgrid(x,y)
-
-z = FrankeFunction(x, y)
-
-# Plot the surface.
-fig = plt.figure()
-ax = fig.gca(projection='3d')
-surf = ax.plot_surface(x, y, z, cmap=cm.coolwarm,linewidth=0, antialiased=False)
-
-# Customize the z axis.
-ax.set_zlim(-0.10, 1.40)
-ax.zaxis.set_major_locator(LinearLocator(10))
-ax.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
-
-# Add a color bar which maps values to colors.
-fig.colorbar(surf, shrink=0.5, aspect=5)
-
-plt.xlabel('x')
-plt.ylabel('y')
-plt.title('Franke function')
-#plt.show()
-plt.clf()
-
-t1=time.time()
+plot_3D(n)
 
 f_vec=np.zeros(shape=(n2,1))
 
@@ -146,18 +119,15 @@ if (False):
 
 
 
-k=5
-if (False):
-    n=[10,21]
-    rnd=[False,True]
-    for i in range(2):
-        for j in range(2):
-            mse_plot_tradeoff_complexity(k,n[j], rnd[i], p_lim=14)
 
 if (False):
     rnd=[False,True]
-    for i in range (2):
-        mse_plot_tradeoff_number(k,rnd[i],p=5)
+    k=5
+    l_vec=[0.0, 1e-6,1e-4, 1e-2, 1.0]
+    for i in range(2):
+        for j in range(1):
+            mse_plot_tradeoff_number(rnd[i],p=5,k=k,n_max=21,lamb=l_vec)
+            mse_plot_tradeoff_number(rnd[i],p=5,k=k,n_max=21,lamb=l_vec,lasso=True)
 
 if (False):
     n_vec=np.zeros(4,dtype='int')
@@ -167,7 +137,8 @@ if (False):
     for i in range (4):
         mse_plot_tradeoff_kfold(n_vec[i],rnd[i],p=5)
 
-if (True):
+if (False):
+    k=5
     rnd=[False,True]
     n_vec=[10,21]
     for i in range (2):
@@ -177,7 +148,33 @@ if (True):
 if (False):
     n=[10,21]
     rnd=[False,True]
+    k=5
     l_vec=[0.0, 1e-6,1e-4, 1e-2, 1.0]
     for i in range(2):
-        for j in range(2):
+        for j in range(1):
             mse_plot_tradeoff_complexity(k,n[j], rnd[i],lamb=l_vec, p_lim=14)
+            mse_plot_tradeoff_complexity(k,n[j], rnd[i],lamb=l_vec, p_lim=14,lasso=True)
+
+            
+if (False):
+    n=21
+    k=5
+    xv,yv=init_xy_vectors(n,False)
+    n2=n**2
+    #calculate franke function values
+    fv=FrankeFunction(xv,yv)
+    #add noise
+    if (sigma > 0.0):
+        noise=np.random.normal(0.0,1.0,n2)*sigma
+        fv[:,0]=fv[:,0]+noise
+
+    #split data
+    xk,yk,fk,nk=split_data_kfold(xv,yv,fv,k)
+
+    print('MSE   training     test      solver')
+    msek,r2k,beta_k,beta_var_k=polfit_kfold(xk,yk,fk,nk,k,n2,deg=5,lamb=0.0)
+    print('      %.4e     %.4e      OLS'%(np.sum(msek[:,0])/k,np.sum(msek[:,1])/k))
+    msek,r2k,beta_k,beta_var_k=polfit_kfold(xk,yk,fk,nk,k,n2,deg=5,lamb=0.01)
+    print('      %.4e     %.4e      Ridge l=0.01'%(np.sum(msek[:,0])/k,np.sum(msek[:,1])/k))
+    msek,r2k=kfold_CV_lasso(xk,yk,fk,nk,k,n2,deg=5,lamb=1e-4,max_iter=100000,tol=0.0000001)
+    print('      %.4e     %.4e      Lasso l=1e-4'%(np.sum(msek[:,0])/k,np.sum(msek[:,1])/k))

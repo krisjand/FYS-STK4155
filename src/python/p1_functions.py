@@ -1,6 +1,20 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from params import *
+from sklearn import linear_model
+
+def inv_mat_SVD(X):
+
+    U, s, VT = np.linalg.svd(X)
+    D = np.zeros((len(U), len(VT)))
+    for i in range(0,len(VT)):
+        D[i,i] = s[i]
+    UT = U.T;
+    V = VT.T;
+    invD = np.linalg.inv(D)
+    invX = np.matmul(V, np.matmul(invD, UT))
+
+    return invX
 
 def init_xy_vectors(n,rand,xmin=0.0,xmax=1.0):
     
@@ -52,24 +66,23 @@ def polfit(deg,xv,yv,fv,lamb=0.0):
 
     X=np.ones(shape=(n2,n_p)) #we change these values, but in the case of Ridge we don't
                               # have to change X[:,0] values for later evaluation
-    if (deg > 0 or lamb==0.0):
-        for i in range(n2):
-            l=-1
-            for j in range(deg+1):
-                for k in range(j+1):
-                    l+=1
-                    X[i,l]=xv[i,0]**(j-k) * yv[i,0]**k
+    for i in range(n2):
+        l=-1
+        for j in range(deg+1):
+            for k in range(j+1):
+                l+=1
+                X[i,l]=xv[i,0]**(j-k) * yv[i,0]**k
 
-        Xt = X.T
-        XtX = np.matmul(Xt,X)
-        if (lamb>0.0): #i.e. Ridge regression
-            Xlamb=np.zeros(shape=(n_p,n_p)) #(n_p x n_p matrix)
-            for i in range(n_p):
-                Xlamb[i,i]=lamb
-            XtX=XtX+Xlamb
-        Xtf = np.matmul(Xt,fv)
-        XtXi = np.linalg.inv(XtX)
-        beta=np.matmul(XtXi,Xtf)
+    Xt = X.T
+    XtX = np.matmul(Xt,X)
+    if (lamb>0.0): #i.e. Ridge regression
+        Xlamb=np.zeros(shape=(n_p,n_p)) #(n_p x n_p matrix)
+        for i in range(n_p):
+            Xlamb[i,i]=lamb
+        XtX=XtX+Xlamb
+    Xtf = np.matmul(Xt,fv)
+    XtXi = np.linalg.inv(XtX)
+    beta=np.matmul(XtXi,Xtf)
 
     fm=np.mean(fv[:,0])
     fxy=np.matmul(X,beta)
@@ -120,6 +133,22 @@ def eval_pol(betas,x,y,deg):
                 Xm[:,l]=x[:,0]**(j-k) * y[:,0]**k
 
     return np.matmul(Xm,betas)
+
+def eval_pol3D(betas,x,y,deg):
+    n_p = (deg+1)*(deg+2)//2
+
+    shape_x=np.shape(x)
+    z=np.zeros(shape=(shape_x[0],shape_x[1]))
+    xy=np.zeros(n_p)
+    for r in range(shape_x[0]):
+        for s in range(shape_x[1]):
+            l=-1
+            for j in range(deg+1):
+                for k in range(j+1):
+                    l+=1
+                    xy[l]=x[r,s]**(j-k) * y[r,s]**k
+            z[r,s]=np.sum(xy*betas)
+    return z
 
 def split_data(x_vec,pct): #pct=percentage of data that is training data
 
@@ -237,7 +266,7 @@ def polfit_kfold(xk,yk,fk,nk,k,n2,deg=5,lamb=0.0):
                 Xlamb[s,s]=lamb
             XtX=XtX+Xlamb
         Xtf = np.matmul(Xt,ftr)
-        XtXi = np.linalg.inv(XtX)
+        XtXi = inv_mat_SVD(XtX)
         beta=np.matmul(XtXi,Xtf)
         betas[:,i]=beta[:,0]
 
@@ -253,12 +282,7 @@ def polfit_kfold(xk,yk,fk,nk,k,n2,deg=5,lamb=0.0):
         r2k[i,0]=r2
 
         for j in range(n_p):
-            if (j==0 and lamb>0.0): #Ridge
-                beta_vark[j,i]=t2/(nind-1)**2 
-            elif (lamb>0.0):
-                beta_vark[j,i]=mse*np.sqrt(XtXi[j-1,j-1]) #XtXi is a (n_p-1 x n_p-1) matrix
-            else:
-                beta_vark[j,i]=mse*np.sqrt(XtXi[j,j])
+            beta_vark[j,i]=mse*XtXi[j,j]
 
         
         #mse and r2 for test data (group i)
@@ -278,7 +302,106 @@ def polfit_kfold(xk,yk,fk,nk,k,n2,deg=5,lamb=0.0):
         
     return msek,r2k,betas,beta_vark
 
-def mse_plot_tradeoff_complexity(k,n, rnd,xmin=0.0,xmax=1.0, p_lim=-1,lamb=[0.0]):
+def fit_lasso(deg,xv,yv,fv,lamb=1.0,max_iter=10000,return_fit=False,tol=0.000001):
+    shape_x=np.shape(xv)
+    n2=shape_x[0]
+    
+    n_p=(deg+1)*(deg+2)//2
+    print(n_p)
+    X=np.zeros(shape=(n2,n_p))
+    for i in range(n2):
+        l=-1
+        for j in range(deg+1):
+            for k in range(j+1):
+                l+=1
+                X[i,l]=xv[i,0]**(j-k) * yv[i,0]**k
+
+    reg = linear_model.Lasso(alpha=lamb,max_iter=max_iter)
+    Fxy = reg.fit(X,fv[:,0]).predict(X)
+    mse=np.sum((Fxy-fv[:,0])**2)
+    t1=np.copy(mse)
+    mse=mse/(n2-1)
+    fm=sum(fv[:,0])/n2
+    t2=np.sum((fv[:,0]-fm)**2)
+    r2=1.0-t1/t2
+    beta=np.zeros(shape=(n_p,1))
+    beta[:,0]=reg.coef_
+
+    if (return_fit):
+        return mse,r2,beta,reg
+    else:
+        return mse,r2,beta
+
+def kfold_CV_lasso(xk,yk,fk,nk,k,n2,deg=5,lamb=1.0,tol=0.000001,max_iter=100000):
+    msek=np.zeros(shape=(k,2))
+    r2k=np.zeros(shape=(k,2))
+    n_p=(deg+1)*(deg+2)//2
+    for i in range(k):
+#        print('group %i'%(i))
+        #create X matrix and training data from groups j /= i
+        nind=n2-nk[i]
+        Xtr = np.ones(shape=(nind,n_p))
+        ftr = np.zeros(shape=(nind,1))
+        fte = np.zeros(shape=(nk[i],1))
+        Xte = np.ones(shape=(nk[i],n_p))
+        
+        ind=-1
+        p_min=0
+        for j in range(k):
+            if (j==i):
+                fte[:,0]=np.copy(fk[i,:nk[i]])
+                for m in range(nk[j]):
+                    l=-1
+                    for r in range(deg+1):
+                        for s in range(r+1):
+                            l+=1
+                            Xte[m,l]=xk[j,m]**(r-s) * yk[j,m]**s
+                continue
+            
+            for m in range(nk[j]):
+                ind+=1
+                ftr[ind,0]=np.copy(fk[j,m])
+                
+                l=-1
+                for r in range(deg+1):
+                    for s in range(r+1):
+                        l+=1
+                        Xtr[ind,l]=xk[j,m]**(r-s) * yk[j,m]**s
+
+        # perform Lasso polfit
+        reg = linear_model.Lasso(alpha=lamb,max_iter=max_iter,tol=tol)
+        reg.fit(Xtr,ftr[:,0])
+
+        #mse and r2 for training data
+        fm=np.mean(ftr[:,0])
+        fxy=reg.predict(Xtr)
+        mse=np.sum((ftr[:,0]-fxy)**2)
+        t1=np.copy(mse)
+        mse=mse/(nind-1)
+        msek[i,0]=mse
+        t2=np.sum((ftr[:,0]-fm)**2)
+        r2=1.0-t1/t2
+        r2k[i,0]=r2
+
+
+        #mse and r2 for test data (group i)
+        fm=np.mean(fte[:,0])
+        fxy=reg.predict(Xte)
+        mse=np.sum((fte[:,0]-fxy)**2)
+        t1=np.copy(mse)
+        mse=mse/nk[i]
+        msek[i,1]=mse
+        t2=np.sum((fte-fm)**2)
+        if (t2==0.0):
+            r2=0.0
+        else:
+            r2=1.0-t1/t2
+        r2k[i,1]=r2
+
+        
+    return msek,r2k
+
+def mse_plot_tradeoff_complexity(k,n, rnd,xmin=0.0,xmax=1.0, p_lim=-1,lamb=[0.0],lasso=False, single=False):
     global verbosity
     global sigma
     # k = number of groups (i.e. k-fold CV)
@@ -337,9 +460,20 @@ def mse_plot_tradeoff_complexity(k,n, rnd,xmin=0.0,xmax=1.0, p_lim=-1,lamb=[0.0]
     p_plot=np.zeros(shape=(n_deg))
 
     for i_l in range (n_l):
+
         lamb=l_vec[i_l]
+        if(verbosity > 0):
+            print('')
+            print(' lambda %.3e'%(lamb))
+
         for p in range(n_deg):
-            msek,r2k,betak,var_bk=polfit_kfold(xk,yk,fk,nk,k,n2,deg=p,lamb=lamb)
+            if (lasso):
+                if (lamb==0.0):
+                    msek,r2k,betak,var_bk=polfit_kfold(xk,yk,fk,nk,k,n2,deg=p,lamb=lamb)
+                else:
+                    msek,r2k=kfold_CV_lasso(xk,yk,fk,nk,k,n2,deg=p,lamb=lamb)
+            else:
+                msek,r2k,betak,var_bk=polfit_kfold(xk,yk,fk,nk,k,n2,deg=p,lamb=lamb)
             mse_mean[p,0,i_l]=np.sum(msek[:,0])/k
             mse_mean[p,1,i_l]=np.sum(msek[:,1])/k
             mse_error[0,p,0,i_l]=mse_mean[p,0,i_l]-np.amin(msek[:,0])
@@ -355,6 +489,8 @@ def mse_plot_tradeoff_complexity(k,n, rnd,xmin=0.0,xmax=1.0, p_lim=-1,lamb=[0.0]
             if (verbosity > 2):
                 print('')
                 print('-----------------------------------------------------')
+                if (lasso):
+                    print('Lasso fit')
                 print("polynomial of degree %i, lambda %.3e"%(p,lamb))
                 print('')
                 print('group    mse_tr       mse_te       r2_tr')
@@ -366,89 +502,16 @@ def mse_plot_tradeoff_complexity(k,n, rnd,xmin=0.0,xmax=1.0, p_lim=-1,lamb=[0.0]
                     print(' train_err        %.4e   %.4e   '%(mse_error[0,p,0,i_l], mse_error[1,p,0,i_l]))
                     print(' test_err         %.4e   %.4e   '%(mse_error[0,p,1,i_l], mse_error[1,p,1,i_l]))
                     print(' std (train,test) %.4e   %.4e   '%(mse_error[2,p,0,i_l], mse_error[2,p,1,i_l]))
-            elif(verbosity > 0):
+            elif(verbosity > 1):
                 print('  pol. deg. %i, lamb = %.3e'%(p,lamb))
-
-        #plot the MSE to complexity plot train vs test for lambda 
-        for m in range(2):
-            plt.figure(1)
-            if (m==0):
-                plt.errorbar(p_plot,mse_mean[:,0,i_l],yerr=mse_error[:2,:,0,i_l],label='train', fmt='.')
-                plt.errorbar(p_plot+0.1,mse_mean[:,1,i_l],yerr=mse_error[:2,:,1,i_l],label='test',fmt='x')
-            else:
-                plt.errorbar(p_plot,mse_mean[:,0,i_l],yerr=mse_error[2,:,0,i_l],label='train',fmt='.')
-                plt.errorbar(p_plot+0.1,mse_mean[:,1,i_l],yerr=mse_error[2,:,1,i_l],label='test',fmt='x')
-                
-            plt.legend()
-            plt.xlabel('Complexity (polynomial degree)')
-            plt.ylabel('Mean Square Error')
-            plt.yscale('log')
-            outfile='tradeoff_complex'
-            if (lamb>0.0):
-                outfile=outfile+'_lamb_%.3e'%(lamb)
-            if (rnd):
-                plt.title('Random grid points')
-                outfile=outfile+'_rnd_n%i'%(n)
-                if (m==0):
-                    outfile=outfile+'_minmax.png'
-                else:
-                    outfile=outfile+'_std.png'
-            else:
-                plt.title('Equidistant grid points')
-                outfile=outfile+'_n%i'%(n)
-                if (m==0):
-                    outfile=outfile+'_minmax.png'
-                else:
-                    outfile=outfile+'_std.png'
-
-            plt.savefig(outfile)
-            #plt.show()
-            plt.clf()
-
-    if (n_l ==1):
-        return # only plot multi lambda if we have more than 1 value
-    for m in range(2):
-        for s in range(2):
-            plt.figure(1)
-            for i_l in range(n_l):
-                if (m==0):
-                    plt.errorbar(p_plot+(-n_l//2 + i_l)*0.1,mse_mean[:,s,i_l],yerr=mse_error[:2,:,s,i_l],label='lambda = %.1e'%(l_vec[i_l]), fmt='.')
-                else:
-                    plt.errorbar(p_plot+(-n_l//2 + i_l)*0.1,mse_mean[:,s,i_l],yerr=mse_error[2,:,s,i_l],label='lambda = %.1e'%(l_vec[i_l]), fmt='.')
-            plt.legend()
-            plt.xlabel('Complexity (polynomial degree)')
-            plt.ylabel('Mean Square Error')
-            plt.ylim([np.exp(np.log(np.amin(np.amin(mse_mean)))-0.2), 1.5])
-            plt.yscale('log')
-            outfile='tradeoff_complex_lamb_multi'
-            if (rnd):
-                plt.title('Random grid points')
-                outfile=outfile+'_rnd_n%i'%(n)
-            else:
-                plt.title('Equidistant grid points')
-                outfile=outfile+'_n%i'%(n)
-
-            if (s==0):
-                outfile=outfile+'_train'
-            else:
-                outfile=outfile+'_test'
-
-            if (m==0):
-                outfile=outfile+'_minmax.png'
-            else:
-                outfile=outfile+'_std.png'
-
-            plt.savefig(outfile)
-            #plt.show()
-            plt.clf()
-
-    print('')
-    print('')
-    print('')
-    print('')
+    
+#    ylim=[np.exp(np.log(np.amin(np.amin(np.amin(mse_mean))))-0.2), 1.5]
+    
+    plot_mse(p_plot,mse_mean,mse_error,'Complexity (polynomial degree)','complex',rnd,n=n,ylim=[1e-3,1e2],l_vec=l_vec,lasso=lasso,logx=False,logy=True,single=True)
     return
+    
 
-def mse_plot_tradeoff_number(k,rnd,n_min=6,n_max=30, p=5,xmin=0.0,xmax=1.0,lamb=0.0):
+def mse_plot_tradeoff_number(rnd,n_min=6,n_max=30, p=5,k=5,xmin=0.0,xmax=1.0,lamb=0.0,lasso=False):
     global verbosity
     global sigma
     # k = number of groups (i.e. k-fold CV)
@@ -460,11 +523,17 @@ def mse_plot_tradeoff_number(k,rnd,n_min=6,n_max=30, p=5,xmin=0.0,xmax=1.0,lamb=
     
     # n_vec = number of gridpoints in x and y direction
     n_vec=np.arange(n_min,n_max+1,dtype='int')
-
     n_n=len(n_vec)
+
+    n_l=len(lamb)
+    if (n_l > 1):
+        l_vec=np.zeros(n_l)
+        for i in range(n_l):
+            l_vec[i]=lamb[i]
+
     # MSE means and errors
-    mse_mean=np.zeros(shape=(n_n,2))
-    mse_error=np.zeros(shape=(3,n_n,2)) #(error type, grid points (n*n), train/test)
+    mse_mean=np.zeros(shape=(n_n,2,n_l))
+    mse_error=np.zeros(shape=(3,n_n,2,n_l)) #(error type, grid points (n*n), train/test)
     # error type: (0) lower MSE, (1) higher MSE, (2) std of mean MSE
     # train/test: (0) train, (1) test
     n_plot=np.zeros(shape=(n_n))
@@ -483,7 +552,7 @@ def mse_plot_tradeoff_number(k,rnd,n_min=6,n_max=30, p=5,xmin=0.0,xmax=1.0,lamb=
         n=np.copy(n_vec[i])
         n_plot[i]=n
         if(verbosity > 0):
-            print(' xy-grid NxN, N = %i'%(n))
+            print('n = %i'%(n))
 
         # init x and y points, both in equidistant grids or as random points
         x_vec,y_vec=init_xy_vectors(n,rnd,xmin=xmin,xmax=xmax)
@@ -497,71 +566,27 @@ def mse_plot_tradeoff_number(k,rnd,n_min=6,n_max=30, p=5,xmin=0.0,xmax=1.0,lamb=
 
         #split data
         xk,yk,fk,nk=split_data_kfold(x_vec,y_vec,f_vec,k)
-        
-        msek,r2k,betak,var_bk=polfit_kfold(xk,yk,fk,nk,k,n2,deg=p,lamb=lamb)
-        mse_mean[i,0]=np.sum(msek[:,0])/k
-        mse_mean[i,1]=np.sum(msek[:,1])/k
-        mse_error[0,i,0]=mse_mean[i,0]-np.amin(msek[:,0])
-        mse_error[1,i,0]=np.amax(msek[:,0])-mse_mean[i,0]
-        mse_error[2,i,0]=np.sqrt(1.0/(k-1.0)*np.sum((msek[:,0]-mse_mean[i,0])**2))
-        mse_error[0,i,1]=mse_mean[i,1]-np.amin(msek[:,1])
-        mse_error[1,i,1]=np.amax(msek[:,1])-mse_mean[i,1]
-        mse_error[2,i,1]=np.sqrt(1.0/(k-1.0)*np.sum((msek[:,1]-mse_mean[i,1])**2))
+
+        for i_l in range(n_l):
+            lamb=l_vec[i_l]
+            if (lasso):
+                if (lamb==0.0):
+                    msek,r2k,betak,var_bk=polfit_kfold(xk,yk,fk,nk,k,n2,deg=p,lamb=lamb)
+                else:
+                    msek,r2k=kfold_CV_lasso(xk,yk,fk,nk,k,n2,deg=p,lamb=lamb)
+            else:
+                msek,r2k,betak,var_bk=polfit_kfold(xk,yk,fk,nk,k,n2,deg=p,lamb=lamb)
+            mse_mean[i,0,i_l]=np.sum(msek[:,0])/k
+            mse_mean[i,1,i_l]=np.sum(msek[:,1])/k
+            mse_error[0,i,0,i_l]=mse_mean[i,0,i_l]-np.amin(msek[:,0])
+            mse_error[1,i,0,i_l]=np.amax(msek[:,0])-mse_mean[i,0,i_l]
+            mse_error[2,i,0,i_l]=np.sqrt(1.0/(k-1.0)*np.sum((msek[:,0]-mse_mean[i,0,i_l])**2))
+            mse_error[0,i,1,i_l]=mse_mean[i,1,i_l]-np.amin(msek[:,1])
+            mse_error[1,i,1,i_l]=np.amax(msek[:,1])-mse_mean[i,1,i_l]
+            mse_error[2,i,1,i_l]=np.sqrt(1.0/(k-1.0)*np.sum((msek[:,1]-mse_mean[i,1,i_l])**2))
             
             
-        # print the different MSE values for each k-fold modelling
-        if (verbosity > 2):
-            print('')
-            print('-----------------------------------------------------')
-            print('grid n = %i,  pol. deg. = %i'%(n,p))
-            print('')
-            print('group    mse_tr       mse_te       r2_tr')
-            for j in range(k):
-                print('  %i    %.4e   %.4e   %.4e '%(j,msek[j,0], msek[j,1],r2k[j,0]))
-            print(' tot   %.4e   %.4e   '%(np.sum(msek[:,0])/k, np.sum(msek[:,1])/k))
-            print('')
-            if (p==2):
-                print(' train_err        %.4e   %.4e   '%(mse_error[0,i,0], mse_error[1,i,0]))
-                print(' test_err         %.4e   %.4e   '%(mse_error[0,i,1], mse_error[1,i,1]))
-                print(' std (train,test) %.4e   %.4e   '%(mse_error[2,i,0], mse_error[2,i,1]))
-        elif(verbosity > 0):
-            print('  grid n = %i,  pol. deg. = %i'%(n,p))
-
-    #plot the MSE to number of gridpoints plot plot
-    for m in range(2):
-        plt.figure(1)
-        if (m==0):
-            plt.errorbar(n_plot,mse_mean[:,0],yerr=mse_error[:2,:,0],label='train', fmt='.')
-            plt.errorbar(n_plot+0.1,mse_mean[:,1],yerr=mse_error[:2,:,1],label='test',fmt='x')
-        else:
-            plt.errorbar(n_plot,mse_mean[:,0],yerr=mse_error[2,:,0],label='train',fmt='.')
-            plt.errorbar(n_plot+0.1,mse_mean[:,1],yerr=mse_error[2,:,1],label='test',fmt='x')
-                
-        plt.legend()
-        plt.xlabel('Number of grid points in each dimension (n)')
-        plt.ylabel('Mean Square Error')
-        plt.yscale('log')
-        outfile='tradeoff_number'
-        if (lamb>0.0):
-            outfile=outfile+'_lamb_%.3e'%(lamb)
-        if (rnd[i]):
-            plt.title('Random grid points')
-            outfile=outfile+'_rnd_n%i'%(n)
-            if (m==0):
-                outfile=outfile+'_minmax.png'
-            else:
-                outfile=outfile+'_std.png'
-        else:
-            plt.title('Equidistant grid points')
-            outfile=outfile+'_n%i'%(n)
-            if (m==0):
-                outfile=outfile+'_minmax.png'
-            else:
-                outfile=outfile+'_std.png'
-
-        plt.savefig(outfile)
-        #plt.show()
-        plt.clf()
+    plot_mse(n_plot,mse_mean,mse_error,'Number of grid points in each dimension (n)','number',rnd,deg=p,l_vec=l_vec,lasso=lasso,logx=False,logy=True,single=True)        
     return
 
 
@@ -663,7 +688,7 @@ def mse_plot_tradeoff_kfold(n,rnd, k_min=2, k_max=10, p=5,xmin=0.0,xmax=1.0,lamb
         outfile='tradeoff_kfold'
         if (lamb>0.0):
             outfile=outfile+'_lamb_%.3e'%(lamb)
-        if (rnd[i]):
+        if (rnd):
             plt.title('Random grid points')
             outfile=outfile+'_rnd_n%i'%(n)
             if (m==0):
@@ -849,5 +874,112 @@ def mse_plot_tradeoff_lambda(n,rnd,lamb_min=0.1,lamb_max=1.0,n_lamb=10, log_lamb
             #plt.show()
             plt.clf()
 
+
+    return
+
+
+
+def plot_mse(x_plot,mse_mean,mse_error,xlab,lab,rnd,n=0,deg=-1,ylim=[0.0],l_vec=[0.0],lasso=False,logx=False,logy=False,single=False):
+    shape_mse=np.shape(mse_mean)
+    n_l=shape_mse[2]
+    for i_l in range(n_l):
+        for m in range(2):
+            if ((not n_l==1) and (not single)):
+                break
+            plt.figure(1)
+            lamb=l_vec[i_l]
+            if (m==0):
+                plt.errorbar(x_plot,mse_mean[:,0,i_l],yerr=mse_error[:2,:,0,i_l],label='train', fmt='.')
+                if (logx):
+                    plt.errorbar(np.exp(np.log(x_plot)+0.1),mse_mean[:,1,i_l],yerr=mse_error[:2,:,1,i_l],label='test',fmt='x')
+                else:
+                    plt.errorbar(x_plot+0.1,mse_mean[:,1,i_l],yerr=mse_error[:2,:,1,i_l],label='test',fmt='x')
+
+            else:
+                plt.errorbar(x_plot,mse_mean[:,0,i_l],yerr=mse_error[2,:,0,i_l],label='train',fmt='.')
+                if (logx):
+                    plt.errorbar(np.exp(np.log(x_plot)+0.1),mse_mean[:,1,i_l],yerr=mse_error[2,:,1,i_l],label='test',fmt='x')
+                else:
+                    plt.errorbar(x_plot+0.1,mse_mean[:,1,i_l],yerr=mse_error[2,:,1,i_l],label='test',fmt='x')
+                
+                
+            plt.legend()
+            plt.xlabel(xlab)
+            plt.ylabel('Mean Square Error')
+            if (not ylim[0]==0.0):
+                plt.ylim(ylim)
+            if (logy):
+                plt.yscale('log')
+            outfile='tradeoff_'+lab
+            if (lasso):
+                outfile=outfile+'_lasso'
+            else:
+                outfile=outfile+'_ridge'
+            if (lamb>0.0):
+                outfile=outfile+'_lamb_%.3e'%(lamb)
+            if (rnd):
+                plt.title('Random grid points')
+            else:
+                plt.title('Equidistant grid points')
+            if (not n==0):
+                outfile=outfile+'_n%i'%(n)
+            if (not deg==-1):
+                outfile=outfile+'_pol%i'%(deg)
+            if (m==0):
+                outfile=outfile+'_minmax.png'
+            else:
+                outfile=outfile+'_std.png'
+
+            plt.savefig(outfile)
+            #plt.show()
+            plt.clf()
+
+    if (n_l ==1):
+        return # only plot multi lambda if we have more than 1 value
+    for m in range(2):
+        for s in range(2):
+            plt.figure(1)
+            for i_l in range(n_l):
+                if (m==0):
+                    plt.errorbar(x_plot+(-n_l//2 + i_l)*0.1,mse_mean[:,s,i_l],yerr=mse_error[:2,:,s,i_l],label='lambda = %.1e'%(l_vec[i_l]), fmt='.')
+                else:
+                    if (logx):
+                        plt.errorbar(np.exp(np.log(x_plot)+(-n_l//2 + i_l)*0.1),mse_mean[:,s,i_l],yerr=mse_error[2,:,s,i_l],label='lambda = %.1e'%(l_vec[i_l]), fmt='.')
+                    else:
+                        plt.errorbar(x_plot+(-n_l//2 + i_l)*0.1,mse_mean[:,s,i_l],yerr=mse_error[2,:,s,i_l],label='lambda = %.1e'%(l_vec[i_l]), fmt='.')
+            plt.legend()
+            plt.xlabel(xlab)
+            plt.ylabel('Mean Square Error')
+            if (not ylim[0]==0.0):
+                plt.ylim(ylim)
+            if (logy):
+                plt.yscale('log')
+            if (lasso):
+                outfile='tradeoff_'+lab+'_lasso_lamb_multi'
+            else:
+                outfile='tradeoff_'+lab+'_ridge_lamb_multi'
+            if (rnd):
+                plt.title('Random grid points')
+                outfile=outfile+'_rnd'
+            else:
+                plt.title('Equidistant grid points')
+
+            if (not n==0):
+                outfile=outfile+'_n%i'%(n)
+            if (not deg==-1):
+                outfile=outfile+'_pol%i'%(deg)
+            if (s==0):
+                outfile=outfile+'_train'
+            else:
+                outfile=outfile+'_test'
+
+            if (m==0):
+                outfile=outfile+'_minmax.png'
+            else:
+                outfile=outfile+'_std.png'
+
+            plt.savefig(outfile)
+            #plt.show()
+            plt.clf()
 
     return
