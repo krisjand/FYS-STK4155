@@ -16,21 +16,35 @@ def inv_mat_SVD(X):
 
     return invX
 
-def init_xy_vectors(n,rand,xmin=0.0,xmax=1.0):
-    
-    if (rand):
-        x_vec=np.random.uniform(xmin,xmax,size=(n**2,1))
-        y_vec=np.random.uniform(xmin,xmax,size=(n**2,1))
-    else:
-        dx=np.zeros(1)
-        dx=(xmax-xmin)/(n-1)
-        n2=n**2
-        x_vec=np.zeros(shape=(n**2,1))
-        y_vec=np.zeros(shape=(n**2,1))
+def init_xy_vectors(n,rand,xmin=0.0,xmax=1.0,rearr=False,x=np.zeros(shape=(1,1)),y=np.zeros(shape=(1,1)),z=np.zeros(shape=(1,1))):
+
+    if (rearr):
+        shape_x=np.shape(x)
+        n=shape_x[0]
+        m=shape_x[1]
+        nm=n*m
+        x_vec=np.random.uniform(xmin,xmax,size=(nm,1))
+        y_vec=np.random.uniform(xmin,xmax,size=(nm,1))
+        z_vec=np.random.uniform(xmin,xmax,size=(nm,1))
         for i in range(n):
-            x_vec[n*i:n*(i+1),0]=xmin + i*dx
-            y_vec[i:n2:n,0]=xmin + i*dx
-    return x_vec,y_vec
+            x_vec[m*i:m*(i+1),0]=x[i,:]
+            y_vec[m*i:m*(i+1),0]=y[i,:]
+            z_vec[m*i:m*(i+1),0]=z[i,:]
+        return x_vec,y_vec,z_vec
+    else:
+        n2=n**2
+        if (rand):
+            x_vec=np.random.uniform(xmin,xmax,size=(n2,1))
+            y_vec=np.random.uniform(xmin,xmax,size=(n2,1))
+        else:
+            dx=np.zeros(1)
+            dx=(xmax-xmin)/(n-1)
+            x_vec=np.zeros(shape=(n2,1))
+            y_vec=np.zeros(shape=(n2,1))
+            for i in range(n):
+                x_vec[n*i:n*(i+1),0]=xmin + i*dx
+                y_vec[i:n2:n,0]=xmin + i*dx
+        return x_vec,y_vec
 
 def FrankeFunction(x,y):
     term1 = 0.75*np.exp(-(0.25*(9*x-2)**2) - 0.25*((9*y-2)**2))
@@ -326,6 +340,7 @@ def fit_lasso(deg,xv,yv,fv,lamb=1.0,max_iter=10000,return_fit=False,tol=0.000001
     r2=1.0-t1/t2
     beta=np.zeros(shape=(n_p,1))
     beta[:,0]=reg.coef_
+    beta[0,0]+=reg.intercept_
 
     if (return_fit):
         return mse,r2,beta,reg
@@ -336,8 +351,11 @@ def kfold_CV_lasso(xk,yk,fk,nk,k,n2,deg=5,lamb=1.0,tol=0.000001,max_iter=100000)
     msek=np.zeros(shape=(k,2))
     r2k=np.zeros(shape=(k,2))
     n_p=(deg+1)*(deg+2)//2
+    betas=np.zeros(shape=(n_p,k))
+    beta=np.zeros(shape=(n_p,1))
+
     for i in range(k):
-#        print('group %i'%(i))
+        #print('group %i'%(i))
         #create X matrix and training data from groups j /= i
         nind=n2-nk[i]
         Xtr = np.ones(shape=(nind,n_p))
@@ -371,7 +389,9 @@ def kfold_CV_lasso(xk,yk,fk,nk,k,n2,deg=5,lamb=1.0,tol=0.000001,max_iter=100000)
         # perform Lasso polfit
         reg = linear_model.Lasso(alpha=lamb,max_iter=max_iter,tol=tol)
         reg.fit(Xtr,ftr[:,0])
-
+        beta[:,0]=reg.coef_
+        beta[0,0]+=reg.intercept_
+        betas[:,i]=beta[:,0]
         #mse and r2 for training data
         fm=np.mean(ftr[:,0])
         fxy=reg.predict(Xtr)
@@ -399,7 +419,7 @@ def kfold_CV_lasso(xk,yk,fk,nk,k,n2,deg=5,lamb=1.0,tol=0.000001,max_iter=100000)
         r2k[i,1]=r2
 
         
-    return msek,r2k
+    return msek,r2k,betas
 
 def mse_plot_tradeoff_complexity(k,n, rnd,xmin=0.0,xmax=1.0, p_lim=-1,lamb=[0.0],lasso=False, single=False):
     global verbosity
