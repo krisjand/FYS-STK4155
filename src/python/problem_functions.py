@@ -72,7 +72,7 @@ def run_tradeoff_complexity():
 def run_tradeoff_complexity_eqsplit():
     #use the same splits and noise for Lasso and Ridge
     n=[10,21]
-    ylim=np.array([[1e-3,1e1],[5e-3,0.15]])
+    ylim=np.array([[1e-3,1e1],[4e-3,0.15]])
     rnd=[False,True]
     k=5
     leg_pos=['upper left','lower left']
