@@ -9,7 +9,7 @@ from sklearn import linear_model
 import time
 
 from params import *
-from p1_functions import *
+from linreg_functions import *
 
 
 def plot_3D(n,lamb=[0.0],rand=False):
@@ -219,7 +219,7 @@ def plot_surf(x,y,z,zfit=0.0,model='none',deg=-1,lamb=0.0,noise=False,colbar=Fal
     if (debug):
         plt.show()
 
-    plt.savefig(filename)
+    plt.savefig('figs/'+filename)
     plt.clf()
 
     return
