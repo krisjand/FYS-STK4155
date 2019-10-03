@@ -14,12 +14,11 @@ def run_tradeoff_number():
     k=4
     l_vec=[0.0, 1e-6,1e-4, 1e-2, 1.0]
     for i in range(2):
-        for j in range(1):
-            #ensure the same splits, noise etc for rideg and lasso
-            st0=np.random.get_state()
-            mse_plot_tradeoff_number(rnd[i],p=5,k=k,n_max=21,lamb=l_vec)
-            np.random.set_state(st0)
-            mse_plot_tradeoff_number(rnd[i],p=5,k=k,n_max=21,lamb=l_vec,lasso=True)
+        #ensure the same splits, noise etc for rideg and lasso
+        st0=np.random.get_state()
+        mse_plot_tradeoff_number(rnd[i],p=5,k=k,n_max=21,lamb=l_vec)
+        np.random.set_state(st0)
+        mse_plot_tradeoff_number(rnd[i],p=5,k=k,n_max=21,lamb=l_vec,lasso=True)
     return
             
 #plot kfold tradeoff (group size/number of groups)

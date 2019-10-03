@@ -232,7 +232,7 @@ def split_data_kfold(x_vec,y_vec,f_vec,k): #k=number of data groups
 
 
 
-def polfit_kfold(xk,yk,fk,nk,k,n2,deg=5,lamb=0.0):
+def polfit_kfold(xk,yk,fk,nk,k,n2,deg=5,lamb=0.0,var_mse=False):
     msek=np.zeros(shape=(k,2))
     r2k=np.zeros(shape=(k,2))
     n_p=(deg+1)*(deg+2)//2
@@ -276,6 +276,7 @@ def polfit_kfold(xk,yk,fk,nk,k,n2,deg=5,lamb=0.0):
         XtX = np.matmul(Xt,Xtr)
         if (lamb>0.0): #i.e. Ridge regression
             Xlamb=np.zeros(shape=(n_p,n_p)) #(n_p x n_p matrix)
+            XtX0=np.copy(XtX) #for variance determination
             for s in range(n_p):
                 Xlamb[s,s]=lamb
             XtX=XtX+Xlamb
@@ -294,10 +295,6 @@ def polfit_kfold(xk,yk,fk,nk,k,n2,deg=5,lamb=0.0):
         t2=np.sum((ftr-fm)**2)
         r2=1.0-t1/t2
         r2k[i,0]=r2
-
-        for j in range(n_p):
-            beta_vark[j,i]=mse*XtXi[j,j]
-
         
         #mse and r2 for test data (group i)
         fm=np.mean(fte[:,0])
@@ -312,6 +309,22 @@ def polfit_kfold(xk,yk,fk,nk,k,n2,deg=5,lamb=0.0):
         else:
             r2=1.0-t1/t2
         r2k[i,1]=r2
+
+        if (var_mse):
+            var_scale=mse
+        else:
+            var_scale=sigma**2
+            
+        for j in range(n_p):
+            if (lamb > 0.0):
+                Xv=np.matmul(XtXi,np.matmul(XtX0,np.transpose(XtXi)))
+                beta_vark[j,i]=var_scale*Xv[j,j]
+            else:
+                beta_vark[j,i]=var_scale*XtXi[j,j]
+            #beta_vark[j,i]=mse*XtXi[j,j] #not sure if one can say that it is
+            #the white noise level, or the mse of either the training or test data.
+            #If we only have the data, and do not know the noise, out best estimate of the
+            #white noise level is the test mse
 
         
     return msek,r2k,betas,beta_vark
