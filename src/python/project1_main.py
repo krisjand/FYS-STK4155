@@ -12,7 +12,11 @@ import time
 from params import *
 from linreg_functions import *
 from problem_functions import *
+from terrain import *
 from plot_3d import *
+
+plot_terrain()
+exit()
 
 n=21
 n2=n**2

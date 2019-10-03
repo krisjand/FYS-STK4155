@@ -21,9 +21,9 @@ def inv_mat_SVD(X):
 
     return invX
 
-def init_xy_vectors(n,rand,xmin=0.0,xmax=1.0,rearr=False,x=np.zeros(shape=(1,1)),y=np.zeros(shape=(1,1)),z=np.zeros(shape=(1,1))):
+def init_xy_vectors(n,rand,xmin=0.0,xmax=1.0,rearr=False,x=np.zeros(shape=(1,1)),y=np.zeros(shape=(1,1)),z=np.zeros(shape=(1,1)),ter=False):
 
-    if (rearr):
+    if (rearr and (not ter)):
         shape_x=np.shape(x)
         n=shape_x[0]
         m=shape_x[1]
@@ -35,6 +35,19 @@ def init_xy_vectors(n,rand,xmin=0.0,xmax=1.0,rearr=False,x=np.zeros(shape=(1,1))
             x_vec[m*i:m*(i+1),0]=x[i,:]
             y_vec[m*i:m*(i+1),0]=y[i,:]
             z_vec[m*i:m*(i+1),0]=z[i,:]
+        return x_vec,y_vec,z_vec
+    if (rearr and ter):
+        shape_z=np.shape(z)
+        n=shape_z[0] #along y
+        m=shape_z[1] #along x
+        nm=n*m
+        x_vec=np.random.uniform(xmin,xmax,size=(nm,1))
+        y_vec=np.random.uniform(xmin,xmax,size=(nm,1))
+        z_vec=np.random.uniform(xmin,xmax,size=(nm,1))
+        for i in range(n):
+            x_vec[m*i:m*(i+1),0]=x[:]   # along row i, x increases
+            y_vec[m*i:m*(i+1),0]=y[i]   # along row i, y is constant
+            z_vec[m*i:m*(i+1),0]=z[i,:] # along row i for the terrain
         return x_vec,y_vec,z_vec
     else:
         n2=n**2
@@ -161,6 +174,21 @@ def eval_pol3D(betas,x,y,deg):
                 for k in range(j+1):
                     l+=1
                     xy[l]=x[r,s]**(j-k) * y[r,s]**k
+            z[r,s]=np.sum(xy*betas)
+    return z
+
+def eval_terrain(betas,x,y,deg,nx,ny):
+    n_p = (deg+1)*(deg+2)//2
+
+    z=np.zeros(shape=(ny,nx))
+    xy=np.zeros(n_p)
+    for r in range(ny):
+        for s in range(nx):
+            l=-1
+            for j in range(deg+1):
+                for k in range(j+1):
+                    l+=1
+                    xy[l]=x[s]**(j-k) * y[r]**k
             z[r,s]=np.sum(xy*betas)
     return z
 
