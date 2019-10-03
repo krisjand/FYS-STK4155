@@ -15,6 +15,8 @@ from problem_functions import *
 from terrain import *
 from plot_3d import *
 
+np.random.seed(seed)
+
 plot_terrain()
 exit()
 
