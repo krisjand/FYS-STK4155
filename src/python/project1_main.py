@@ -26,7 +26,7 @@ if (False):
     run_tradeoff_number()
     
 #plot kfold tradeoff (group size/number of groups)
-if (False):
+if (True):
     run_tradeoff_kfold()
     
 #plot lambda tradeoff
@@ -38,7 +38,7 @@ if (False):
     run_tradeoff_complexity()
 
 # plot complexity tradeoff
-if (True): #use the same splits and noise for Lasso and Ridge
+if (False): #use the same splits and noise for Lasso and Ridge
     run_tradeoff_complexity_eqsplit()
 
 # a test of OLS, Ridge and Lasso on same data
