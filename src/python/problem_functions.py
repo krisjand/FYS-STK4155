@@ -34,7 +34,7 @@ def run_tradeoff_kfold():
 
 #plot lambda tradeoff
 def run_tradeoff_lambda():
-    k=5
+    k=4
     rnd=[False,True]
     n_vec=[10,21]
     for i in range (1):
@@ -51,15 +51,16 @@ def run_tradeoff_lambda():
             #split data
             xk,yk,fk,nk=split_data_kfold(x_vec,y_vec,f_vec,k)
 
-            mse_plot_tradeoff_lambda(n_vec[j],rnd[i],lamb_min=1e-6,lamb_max=10.0,k=k,p=7,plt_lines=True,data_input=True,xv=xk,yv=yk,fv=fk,nv=nk)
-            mse_plot_tradeoff_lambda(n_vec[j],rnd[i],lamb_min=1e-6,lamb_max=10.0,k=k,p=5,data_input=True,xv=xk,yv=yk,fv=fk,nv=nk)
+            mse_plot_tradeoff_lambda(n_vec[j],rnd[i],lamb_min=1e-8,lamb_max=1.0,k=k,p=7,plt_lines=True,data_input=True,xv=xk,yv=yk,fv=fk,nv=nk,lasso=True)
+            #mse_plot_tradeoff_lambda(n_vec[j],rnd[i],lamb_min=1e-6,lamb_max=10.0,k=k,p=7,plt_lines=True,data_input=True,xv=xk,yv=yk,fv=fk,nv=nk)
+            #mse_plot_tradeoff_lambda(n_vec[j],rnd[i],lamb_min=1e-6,lamb_max=10.0,k=k,p=5,data_input=True,xv=xk,yv=yk,fv=fk,nv=nk)
     return
 
 # plot complexity tradeoff
 def run_tradeoff_complexity():
     n=[10,21]
     rnd=[False,True]
-    k=5
+    k=4
     l_vec=[0.0, 1e-6,1e-4, 1e-2, 1.0]
     for i in range(2):
         for j in range(1):
@@ -73,7 +74,7 @@ def run_tradeoff_complexity_eqsplit():
     n=[10,21]
     ylim=np.array([[1e-3,1e1],[4e-3,0.15]])
     rnd=[False,True]
-    k=5
+    k=4
     leg_pos=['upper left','lower left']
     for i in range(2):
         for j in range(2):
@@ -97,7 +98,7 @@ def run_tradeoff_complexity_eqsplit():
 # test of OLS, Ridge and Lasso on same data
 def run_model_comp():
     n=21
-    k=5
+    k=4
     xv,yv=init_xy_vectors(n,False)
     n2=n**2
     #calculate franke function values
@@ -188,7 +189,7 @@ def part_ab():
 
     #k-fold CV on OLS
     if (True):
-        k=5
+        k=4
         xk,yk,fk,nk=split_data_kfold(x_vec,y_vec,f_vec,k)
 
         if (verbosity > 2):
@@ -237,6 +238,42 @@ def part_ab():
 # plotting the results              #
 #####################################
 
+def run_unit_test(n,deg,lamb=0.0,lasso=False):
+    print('Testing regression methods with')
+    print('test function is f(x,y) =  0.1 + 3.2*x -5.7*y + 0.6*x*y + 1.3*y**3 - 1.7*y*x**3')
+    print('')
+    print('Solution')
+    print('b_0 = 0.1')
+    print('b_1 = 3.2')
+    print('b_2 = -5.7')
+    print('b_4 = 0.6')
+    print('b_9 = 1.3')
+    print('b_11 = -1.7')
+    print('')
+    print('')
+    print('Testing')
+    print('lambda %.3e'%(lamb))
+    print('n=%i'%(n))
+    if (lamb==0.0):
+        print('OLS')
+    elif (lasso):
+        print('Lasso')
+    else:
+        print('Ridge')
+
+    #do the regfit
+    xv,yv=init_xy_vectors(n,False)
+    fv=test_function(xv,yv)
+    if (lasso):
+        mse,r2,beta=fit_lasso(deg,xv,yv,fv,lamb=lamb)
+    else:
+        beta,mse,r2,beta_var=polfit(deg,xv,yv,fv,lamb=lamb)
+
+    print('')
+    for i in range(len(beta[:,0])):
+        print('b_%i = %.3f'%(i,beta[i,0]))
+    return
+    
 def mse_plot_tradeoff_complexity(k,n, rnd,xmin=0.0,xmax=1.0, p_lim=-1,lamb=[0.0],lasso=False, single=False,data_input=False,xv=0.0,yv=0.0,fv=0.0,nv=-1,ylim=[0.0],leg_pos='lower left'):
     global verbosity
     global sigma
@@ -525,8 +562,8 @@ def mse_plot_tradeoff_kfold(n,rnd, k_min=2, k_max=10, p=5,xmin=0.0,xmax=1.0,lamb
             plt.errorbar(k_plot+0.1,mse_mean[:,1],yerr=mse_error[2,:,1],label='Test',fmt='x')
                 
         plt.legend()
-        plt.xlabel('Number of groups (k)')
-        plt.ylabel('Mean Square Error')
+        plt.xlabel('Number of groups (k)', fontsize=14)
+        plt.ylabel('Mean Square Error', fontsize=14)
         #if (n<15):
         #    plt.yscale('log')
 
@@ -534,24 +571,24 @@ def mse_plot_tradeoff_kfold(n,rnd, k_min=2, k_max=10, p=5,xmin=0.0,xmax=1.0,lamb
         if (lamb>0.0):
             outfile=outfile+'_ridge_lamb_%.1e'%(lamb)
         if (rnd):
-            plt.title('Random grid points')
+            #plt.title('Random grid points')
             outfile=outfile+'_rnd_n%i'%(n)
         else:
-            plt.title('Equidistant grid points')
+            #plt.title('Equidistant grid points')
             outfile=outfile+'_n%i'%(n)
         if (m==0):
             outfile=outfile+'_minmax'+fig_format
         else:
             outfile=outfile+'_std'+fig_format
 
-        plt.savefig('figs/'+outfile)
+        plt.savefig('figs/'+outfile, bbox_inches='tight',  pad_inches=0.1)
 
                 
         #plt.show()
         plt.clf()
     return
 
-def mse_plot_tradeoff_lambda(n,rnd,lamb_min=0.1,lamb_max=1.0,n_lamb=10, log_lamb=True, k=5, p=5,xmin=0.0,xmax=1.0,plt_title=False,plt_lines=False,data_input=False,xv=0.0,yv=0.0,fv=0.0,nv=-1):
+def mse_plot_tradeoff_lambda(n,rnd,lamb_min=0.1,lamb_max=1.0,n_lamb=10, log_lamb=True, k=5, p=5,xmin=0.0,xmax=1.0,plt_title=False,plt_lines=False,data_input=False,xv=0.0,yv=0.0,fv=0.0,nv=-1,lasso=False):
     global verbosity
     global sigma
     global fig_format
@@ -617,8 +654,11 @@ def mse_plot_tradeoff_lambda(n,rnd,lamb_min=0.1,lamb_max=1.0,n_lamb=10, log_lamb
         for i in range(n_lamb):
             lamb=lamb_vec[i]
             l_plot[i]=lamb
-    
-            msek,r2k,betak,var_bk=polfit_kfold(xk,yk,fk,nk,k,n2,deg=p_i,lamb=lamb)
+
+            if (lasso):
+                msek,r2k,betak=kfold_CV_lasso(xk,yk,fk,nk,k,n2,deg=p_i,lamb=lamb)
+            else:
+                msek,r2k,betak,var_bk=polfit_kfold(xk,yk,fk,nk,k,n2,deg=p_i,lamb=lamb)
             mse_mean[i,0,p_i]=np.sum(msek[:,0])/k
             mse_mean[i,1,p_i]=np.sum(msek[:,1])/k
             mse_error[0,i,0,p_i]=mse_mean[i,0,p_i]-np.amin(msek[:,0])
@@ -713,6 +753,8 @@ def mse_plot_tradeoff_lambda(n,rnd,lamb_min=0.1,lamb_max=1.0,n_lamb=10, log_lamb
             plt.ylabel('Mean Square Error', fontsize=14)
             #plt.yscale('log')
             outfile='tradeoff_lamb_pol'
+            if (lasso):
+                outfile+='_lasso'
             if (log_lamb):
                 plt.xscale('log')
                 outfile=outfile+'_log'
@@ -739,7 +781,7 @@ def mse_plot_tradeoff_lambda(n,rnd,lamb_min=0.1,lamb_max=1.0,n_lamb=10, log_lamb
                 else:
                     outfile=outfile+'_std'+fig_format
 
-            plt.savefig('figs/'+outfile)
+            plt.savefig('figs/'+outfile, bbox_inches='tight',  pad_inches=0.1)
 
                 
             #plt.show()
@@ -905,7 +947,7 @@ def plot_mse(x_plot,mse_mean,mse_error,xlab,lab,rnd,n=0,deg=-1,ylim=[0.0],l_vec=
                     outfile=outfile+'_std'
             outfile+=fig_format
 
-            plt.savefig('figs/'+outfile)
+            plt.savefig('figs/'+outfile, bbox_inches='tight',  pad_inches=0.1)
             #plt.show()
             plt.clf()
 

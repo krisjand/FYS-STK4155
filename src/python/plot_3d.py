@@ -86,8 +86,8 @@ def plot_3D(n,lamb=[0.0],rand=False,var_check=False,diff_noise=False,exit_early=
         for i in range(n_p):
             if (verbosity>1):
                 print('beta %i: calc_var = %10.5f ,  eq_var = %10.5f'%(i,bv_calc[i],bv_mean[i]))
-            plot_betas(betas[i,:],cal_std=b_std[i],b_mean=beta_mean[i],eq_std=np.array([be_std[i]]),nb=i,lamb=lamb[0],n=n,btype='beta',plt_title=True,plt_val=True,diff_noise=diff_noise,var_mse=var_mse)
-            plot_betas(bvs[i,:],cal_std=bv_std[i],b_mean=bv_mean[i],nb=i,lamb=lamb[0],n=n,btype='var',plt_title=True,plt_val=True,diff_noise=diff_noise,var_mse=var_mse)
+            plot_betas(betas[i,:],cal_std=b_std[i],b_mean=beta_mean[i],eq_std=np.array([be_std[i]]),nb=i,lamb=lamb[0],n=n,btype='beta',plt_title=False,plt_val=True,diff_noise=diff_noise,var_mse=var_mse)
+            plot_betas(bvs[i,:],cal_std=bv_std[i],b_mean=bv_mean[i],nb=i,lamb=lamb[0],n=n,btype='var',plt_title=False,plt_val=True,diff_noise=diff_noise,var_mse=var_mse)
 
         if (exit_early):
             return
@@ -97,7 +97,7 @@ def plot_3D(n,lamb=[0.0],rand=False,var_check=False,diff_noise=False,exit_early=
         print('Plotting Franke function without noise')
 
     plot_surf(x,y,z0,colbar=True)    
-    plot_surf(x,y,z0)
+    plot_surf(x,y,z0,plt_title=True)
 
     if (var_check and diff_noise):
         if (sigma>0.0):
@@ -125,6 +125,8 @@ def plot_3D(n,lamb=[0.0],rand=False,var_check=False,diff_noise=False,exit_early=
         plot_betas(beta,cal_std=beta_std,n=n,model='ols',deg=deg,btype='all')
     #Do a Ridge regression for chosen lambda values for 5th degree polynomial fit
     lamb=[1.0,1e-2,1e-4,1e-6]
+    beta_l=np.zeros(shape=(21,6))
+    beta_l[:,0]=beta
     deg=5
     for i in range(len(lamb)):
         if (verbosity>0):
@@ -133,9 +135,10 @@ def plot_3D(n,lamb=[0.0],rand=False,var_check=False,diff_noise=False,exit_early=
         beta=np.mean(betak,axis=1)
         beta_std=np.sqrt(np.mean(bv,axis=1))            
         zfit=eval_pol3D(beta,x,y,deg)
-
+        beta_l[:,i+1]=beta
         plot_surf(x,y,z,zfit=zfit,model='ridge',deg=deg,lamb=lamb[i],noise=True)
         plot_betas(beta,cal_std=beta_std,n=n,model='ridge',lamb=lamb[i],btype='all')
+    plot_betas(beta_l,lamb=lamb,model='ridge',plt_lamb=True)
 
     #Do a Lasso regression for chosen lambda values for 5th degree polynomial fit
     lamb=[1.0,1e-2,1e-4,1e-6]
@@ -145,11 +148,12 @@ def plot_3D(n,lamb=[0.0],rand=False,var_check=False,diff_noise=False,exit_early=
         
         mse,r2,betak=kfold_CV_lasso(xk,yk,fk,nk,k,n2,deg=deg,lamb=lamb[i])
         beta=np.mean(betak,axis=1)
-
+        beta_l[:,i+1]=beta
         zfit=eval_pol3D(beta,x,y,deg)
 
         plot_surf(x,y,z,zfit=zfit,model='lasso',deg=deg,lamb=lamb[i],noise=True)
         plot_betas(beta,n=n,model='lasso',lamb=lamb[i],btype='all')
+    plot_betas(beta_l,lamb=lamb,model='lasso',plt_lamb=True)
 
     return
 
@@ -160,7 +164,7 @@ def plot_3D(n,lamb=[0.0],rand=False,var_check=False,diff_noise=False,exit_early=
 
 
 
-def plot_surf(x,y,z,zfit=0.0,model='none',deg=-1,lamb=0.0,noise=False,colbar=False):
+def plot_surf(x,y,z,zfit=0.0,model='none',deg=-1,lamb=0.0,noise=False,colbar=False,plt_title=False):
     # Plot the surface.
     global fig_format
     
@@ -200,7 +204,8 @@ def plot_surf(x,y,z,zfit=0.0,model='none',deg=-1,lamb=0.0,noise=False,colbar=Fal
     plt.ylabel('y',fontsize=14,labelpad=10)
     plt.yticks(rotation=45)
     if (model=='none'):
-        plt.title('Franke function')
+        if (plt_title):
+            plt.title('Franke function')
         filename='franke_function'
         if (noise):
             filename+='_noise'
@@ -208,7 +213,8 @@ def plot_surf(x,y,z,zfit=0.0,model='none',deg=-1,lamb=0.0,noise=False,colbar=Fal
             filename+='_cbar'
         filename+=fig_format
     elif (model=='ols'):
-        plt.title(r'OLS, $p=$ %i'%(deg))
+        if (plt_title):
+            plt.title(r'OLS, $p=$ %i'%(deg))
         filename='ols'
         if (noise):
             filename+='_noise'
@@ -216,7 +222,8 @@ def plot_surf(x,y,z,zfit=0.0,model='none',deg=-1,lamb=0.0,noise=False,colbar=Fal
             filename+='_cbar'
         filename+='_p%i'%(deg)+fig_format
     elif (model=='ridge'):
-        plt.title(r'Ridge, $\lambda = %s \cdot 10^{%s}$'%(lamb_str,sign+power))
+        if (plt_title):
+            plt.title(r'Ridge, $\lambda = %s \cdot 10^{%s}$'%(lamb_str,sign+power))
         filename='ridge'
         if (noise):
             filename+='_noise'
@@ -224,7 +231,8 @@ def plot_surf(x,y,z,zfit=0.0,model='none',deg=-1,lamb=0.0,noise=False,colbar=Fal
             filename+='_cbar'
         filename+='_lamb_%.2e'%(lamb)+fig_format
     elif (model=='lasso'):
-        plt.title(r'Lasso, $\lambda = %s \cdot 10^{%s}$'%(lamb_str,sign+power))
+        if (plt_title):
+            plt.title(r'Lasso, $\lambda = %s \cdot 10^{%s}$'%(lamb_str,sign+power))
         filename='lasso'
         if (noise):
             filename+='_noise'
@@ -238,13 +246,13 @@ def plot_surf(x,y,z,zfit=0.0,model='none',deg=-1,lamb=0.0,noise=False,colbar=Fal
     if (debug):
         plt.show()
 
-    plt.savefig('figs/'+filename)
+    plt.savefig('figs/'+filename, bbox_inches='tight',  pad_inches=0.1)
     plt.clf()
 
     return
 
 
-def plot_betas(beta,cal_std=0.0,b_mean=0.0,nb=-1,n=-1,eq_std=[-1.0],model='none',btype='none',ci=1.96,plt_title=False,plt_val=False,diff_noise=False,lamb=-1.0,var_mse=False,deg=-1):
+def plot_betas(beta,cal_std=0.0,b_mean=0.0,nb=-1,n=-1,eq_std=[-1.0],model='none',btype='none',ci=1.96,plt_title=False,plt_val=False,diff_noise=False,lamb=-1.0,var_mse=False,deg=-1,plt_lamb=False):
 
     ci_cal=cal_std*ci
     if (eq_std[0] > 0.0):
@@ -267,6 +275,21 @@ def plot_betas(beta,cal_std=0.0,b_mean=0.0,nb=-1,n=-1,eq_std=[-1.0],model='none'
             be_std[1,:]=beta+ci_eq
         xplt=np.arange(0,nplt,dtype=np.int64)
         mplt=xplt
+    elif (plt_lamb):
+        plt.xlabel(r'Index $i$',fontsize=14)
+        plt.ylabel(r'$\beta$',fontsize=14)
+        for i in range(len(lamb)+1):
+            if (i == 0):
+                lab='OLS'
+            else:
+                lamb_str,pow_str=get_pow_str(lamb[i-1],1)
+                lab=r'$\lambda=$ %s$\,\cdot 10^{%s}$'%(lamb_str,pow_str)
+            plt.plot(np.arange(0,21,dtype='int'),beta[:,i],label=lab,marker='.',ls='-')
+        plt.legend(loc='lower right')
+        outfile='beta_all_multi_lamb_'+model+fig_format
+        plt.savefig('figs/'+outfile, bbox_inches='tight',  pad_inches=0.1)
+        plt.clf()
+        return
     else:
         plt.xlabel(r'Split number',fontsize=14)
         m_str,pow_str=get_pow_str(b_mean,3)            

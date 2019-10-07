@@ -71,6 +71,9 @@ def FrankeFunction(x,y):
     term4 = -0.2*np.exp(-(9*x-4)**2 - (9*y-7)**2)
     return term1 + term2 + term3 + term4
 
+def test_function(x,y):
+    return 0.1 + 3.2*x -5.7*y + 0.6*x*y + 1.3*y**3 - 1.7*y*x**3
+
 def polfit(deg,xv,yv,fv,lamb=0.0):
     n_p = (deg+1)*(deg+2)//2 #triangular rule but we have defined deg=0 for n=1
     shape_x=np.shape(xv)

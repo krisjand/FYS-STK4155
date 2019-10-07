@@ -26,12 +26,12 @@ def plot_terrain():
 
     # Show the terrain
     plt.figure()
-    plt.title('Terrain over Norway 1')
+    plt.title('Terrain over Norway')
     plt.imshow(terrain1, cmap='gray',vmin=0.0,vmax=1.0)
     plt.xlabel('X')
     plt.ylabel('Y')
     #plt.show()
-    plt.savefig('ter1_full.png')
+    plt.savefig('figs/ter1_full'+fig_format, bbox_inches='tight',  pad_inches=0.1)
     plt.clf()
     
     #reduce terrain
@@ -45,8 +45,10 @@ def plot_terrain():
     nyr=ny//res
     n2=nxr*nyr
     nmax=max(nxr,nyr)
-    x=(np.arange(0,nxr)-nxr//2)/nmax
-    y=(np.arange(0,nyr)-nyr//2)/nmax
+    x=(np.arange(0,nxr))/nmax * 2.0
+    y=(np.arange(0,nyr))/nmax * 2.0
+    #x=(np.arange(0,nxr)-nmax//2)/nmax # centered on (0,0)
+    #y=(np.arange(0,nyr)-nmax//2)/nmax # max extension = 0.5
     x3d, y3d = np.meshgrid(x,y)
     ter_res=np.zeros(shape=(nyr,nxr))
     print('rescale')
@@ -59,15 +61,16 @@ def plot_terrain():
     print(tr_min,tr_max)
     print(np.sum(ter_res)/n2)
     plt.figure(1)
-    plt.title('Terrain over Norway 1')
+    plt.title('Rescaled terrain')
     plt.imshow(ter_res, cmap='gray',vmin=0.0,vmax=1.0)
     plt.xlabel('X')
     plt.ylabel('Y')
     #plt.show()
-    plt.savefig('ter1_rescale.png')
+    plt.savefig('figs/ter1_rescale'+fig_format, bbox_inches='tight',  pad_inches=0.1)
     plt.clf()
+    if (False):
+        return
 
-        
     print('vectorize')
     x_ter,y_ter,t_ter=init_xy_vectors(1,False,rearr=True,ter=True,x=x,y=y,z=ter_res)
     mean_ter=np.sum(terrain1)/(nx*ny)
@@ -77,7 +80,8 @@ def plot_terrain():
     xk,yk,tk,nk=split_data_kfold(x_ter,y_ter,t_ter,k) #k=number of data groups
     l_vec=[0.0,1e-10,1e-8,1e-4]
     n_l=len(l_vec)
-    d_vec=np.arange(10,50,5,dtype='int')
+    #d_vec=np.arange(10,50,5,dtype='int') #with centered values
+    d_vec=np.arange(5,26,5,dtype='int') #with scale 2 not certered
     n_d=len(d_vec)
     MSEs=np.zeros(shape=(n_l,n_d,2))
 
@@ -96,25 +100,27 @@ def plot_terrain():
             print('plot')
             plt.figure(1)
             lstr,powstr=get_pow_str(lamb,1)   
-            plt.title(r'Terrain fit, $\lambda$ = %s$\cdot 10^{%s}$, pol. deg. %i over Norway 1'%(lstr,powstr,deg))
+            plt.title(r'Terrain fit')
             plt.imshow(ter_fit, cmap='gray',vmin=0.0,vmax=1.0)
             plt.xlabel('X')
             plt.ylabel('Y')
             #plt.show()
-            outfile='ter_fit_lamb_%.1e_deg_%i'%(lamb,deg)+fig_format
+            outfile='ter_fit_scale2_lamb_%.1e_deg_%i'%(lamb,deg)+fig_format
             print(outfile)
-            plt.savefig('figs/'+outfile)
+            plt.savefig('figs/'+outfile, bbox_inches='tight',  pad_inches=0.1)
             plt.clf()
 
 
     plt.figure(1)
+    cols=plt.rcParams['axes.prop_cycle'].by_key()['color']    
     for i in range(n_l):
         lstr,powstr=get_pow_str(l_vec[i],1)   
-        plt.plot(d_vec,MSEs[i,:,0],ls='-',marker='.',label='$\lambda$ = %s$\cdot 10^{%s}$'%(lstr,powstr))
-        plt.plot(d_vec,MSEs[i,:,1],ls='--',marker='.')
-    plt.xlabel('Polynomial degree')
-    plt.ylabel('Mean Square Error')
-    outfile='ter_mse'+fig_format
+        plt.plot(d_vec,MSEs[i,:,0],ls='-',marker='.',label='$\lambda = \mathrm{%s}\cdot 10^{%s}$'%(lstr,powstr),color=cols[i])
+        plt.plot(d_vec,MSEs[i,:,1],ls='--',marker='.',color=cols[i])
+    plt.xlabel('Polynomial degree', fontsize=14)
+    plt.ylabel('Mean Square Error', fontsize=14)
+    outfile='ter_mse_scale2'+fig_format
+    plt.legend(loc='upper right')
     plt.savefig('figs/'+outfile)
     plt.clf()
 
